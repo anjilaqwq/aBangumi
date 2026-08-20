@@ -22,11 +22,6 @@
 flutter pub get
 flutter build apk --release
 ```
-
-产物：`build/app/outputs/flutter-apk/app-release.apk`
-
-GitHub Actions 在推送 `main` 分支后会自动构建 release APK 并发布到 [Releases](../../releases)。
-
 ## 登录
 
 在 [bgm.tv 设置页](https://bgm.tv/dev/app) 生成访问令牌（Access Token），在 App「我的」页粘贴登录。令牌仅保存在本机（shared_preferences）。
@@ -34,7 +29,6 @@ GitHub Actions 在推送 `main` 分支后会自动构建 release APK 并发布�
 ## 说明
 
 - 数据与版权归 [Bangumi (bgm.tv)](https://bgm.tv) 所有，本项目仅调用其公开 API。
-- 开发者环境的 debug 构建会把 `*.bgm.tv` 请求转发到宿主机代理（`10.0.2.2:2080`，见 `lib/main.dart`）；release 构建直连。
 - release APK 使用 Flutter 模板默认的 debug 签名，仅供个人安装测试。
 
 ## 技术栈
