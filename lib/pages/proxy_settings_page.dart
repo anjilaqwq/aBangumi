@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../store/proxy_store.dart';
-import '../theme/app_colors.dart';
 import '../widgets/common/page_header.dart';
 
 class ProxySettingsPage extends StatefulWidget {
@@ -106,10 +105,7 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
         children: [
-          const PageHeader(
-            title: '代理',
-            subtitle: 'Xray VPN 通常接管系统流量；这里作为 App 层兜底。',
-          ),
+          const PageHeader(title: '代理'),
           const SizedBox(height: 20),
           Text('当前设置', style: Theme.of(context).textTheme.labelMedium),
           const SizedBox(height: 8),
@@ -124,15 +120,6 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
             selected: {_mode},
             onSelectionChanged: (v) => setState(() => _mode = v.first),
           ),
-          if (_mode == ProxyMode.automatic) ...[
-            const SizedBox(height: 16),
-            Text(
-              '自动模式读取 Android 系统代理。${ProxyStore.instance.systemProxy ?? '当前未检测到系统代理。'}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-            ),
-          ],
           if (manual) ...[
             const SizedBox(height: 24),
             DropdownButtonFormField<ProxyProtocol>(
