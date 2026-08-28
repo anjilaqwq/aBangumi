@@ -18,11 +18,11 @@ class MainActivity : FlutterActivity() {
                 }
                 val proxy = ProxySelector.getDefault()
                     ?.select(Uri.parse("https://api.bgm.tv").toJavaUri())
-                    ?.firstOrNull { it.type() == Proxy.Type.HTTP }
+                    ?.firstOrNull { it.type() == Proxy.Type.HTTP || it.type() == Proxy.Type.SOCKS }
                 val address = proxy?.address() as? java.net.InetSocketAddress
                 result.success(
                     if (address == null) "DIRECT"
-                    else "PROXY ${address.hostString}:${address.port}"
+                    else "${if (proxy?.type() == Proxy.Type.SOCKS) "SOCKS5" else "PROXY"} ${address.hostString}:${address.port}"
                 )
             }
     }
