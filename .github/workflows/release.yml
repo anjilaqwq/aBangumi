@@ -64,8 +64,8 @@ jobs:
       - name: 发布到 Releases
         uses: ncipollo/release-action@v1
         with:
-          tag: v1.1.0
-          name: aBangumi v1.1.0
+          tag: v1.1.1
+          name: aBangumi v1.1.1
           artifacts: build/app/outputs/flutter-apk/app-release.apk
           allowUpdates: true
           omitBodyDuringUpdate: true
