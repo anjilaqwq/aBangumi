@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import '../widgets/subject_type_selector.dart';
 import 'subject_detail_page.dart';
@@ -23,55 +25,77 @@ class _HomePageState extends State<HomePage> {
     _future = BangumiApi.topSubjects(type: _type);
   }
 
-  void _reload() {
-    setState(() {
-      _future = BangumiApi.topSubjects(type: _type);
-    });
+  Future<void> _reload() async {
+    final future = BangumiApi.topSubjects(type: _type);
+    setState(() => _future = future);
+    await future;
   }
 
-  void _onTypeChanged(int t) {
+  void _onTypeChanged(int type) {
     setState(() {
-      _type = t;
-      _future = BangumiApi.topSubjects(type: t);
+      _type = type;
+      _future = BangumiApi.topSubjects(type: type);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final typeLabel = subjectTypeLabel(_type);
     return Scaffold(
-      appBar: AppBar(title: Text('Bangumi ${subjectTypeLabel(_type)}排行榜')),
+      backgroundColor: AppColors.paper,
+      appBar: AppBar(title: const Text('排行榜')),
       body: Column(
         children: [
+          PageHeader(
+            title: '$typeLabel排行榜',
+            subtitle: 'Bangumi 高评分条目',
+            showDivider: false,
+          ),
           SubjectTypeSelector(selected: _type, onChanged: _onTypeChanged),
           Expanded(
             child: FutureBuilder<List<Subject>>(
               future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const LoadingState(message: '正在整理榜单');
                 }
-                if (snap.hasError) {
-                  return _errorView(snap.error.toString());
+                if (snapshot.hasError) {
+                  return ErrorState(
+                    message: '加载失败：${snapshot.error}',
+                    onRetry: _reload,
+                  );
                 }
-                final list = snap.data ?? const [];
+
+                final subjects = snapshot.data ?? const [];
                 return RefreshIndicator(
-                  onRefresh: () async => _reload(),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: list.length,
-                    itemBuilder: (context, i) {
-                      final s = list[i];
-                      return SubjectCard(
-                        subject: s,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  SubjectDetailPage(subjectId: s.id)),
+                  onRefresh: _reload,
+                  child: subjects.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 96),
+                            EmptyState(message: '暂无排行数据'),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(top: 10, bottom: 24),
+                          itemCount: subjects.length,
+                          itemBuilder: (context, index) {
+                            final subject = subjects[index];
+                            return SubjectCard(
+                              subject: subject,
+                              rank: index + 1,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SubjectDetailPage(subjectId: subject.id),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 );
               },
             ),
@@ -80,20 +104,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  Widget _errorView(String msg) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
-              Text('加载失败：$msg', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _reload, child: const Text('重试')),
-            ],
-          ),
-        ),
-      );
 }
