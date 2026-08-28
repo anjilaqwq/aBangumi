@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// this is only the Dart HttpClient fallback.
 enum ProxyMode { off, automatic, manual }
 
-enum ProxyProtocol { http, socks5 }
+enum ProxyProtocol { http }
 
 class ProxySettings {
   final ProxyMode mode;
@@ -23,10 +23,7 @@ class ProxySettings {
     this.protocol = ProxyProtocol.http,
   });
 
-  String get findProxy {
-    final scheme = protocol == ProxyProtocol.socks5 ? 'SOCKS5' : 'PROXY';
-    return '$scheme $host:$port';
-  }
+  String get findProxy => 'PROXY $host:$port';
 
   bool get hasManualProxy =>
       host.trim().isNotEmpty && port > 0 && port <= 65535;
@@ -109,13 +106,27 @@ class ProxyStore extends ChangeNotifier {
     }
   }
 
-  Future<void> testConnection() async {
+  Future<void> testConnection([ProxySettings? candidate]) async {
+    final target = candidate ?? _settings;
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 10);
+    client.findProxy = (_) {
+      switch (target.mode) {
+        case ProxyMode.off:
+          return 'DIRECT';
+        case ProxyMode.automatic:
+          return _systemProxy ?? 'DIRECT';
+        case ProxyMode.manual:
+          return target.hasManualProxy ? target.findProxy : 'DIRECT';
+      }
+    };
     try {
-      final request = await client.getUrl(Uri.parse('https://api.bgm.tv/'));
+      final request = await client.getUrl(
+        Uri.parse('https://api.bgm.tv/calendar'),
+      );
       final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 500) {
+      await response.drain<void>();
+      if (response.statusCode < 200 || response.statusCode >= 400) {
         throw HttpException('HTTP ${response.statusCode}');
       }
     } finally {

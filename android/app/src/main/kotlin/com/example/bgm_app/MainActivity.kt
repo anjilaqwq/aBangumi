@@ -1,6 +1,7 @@
 package com.example.bgm_app
 
 import android.net.Uri
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -18,13 +19,27 @@ class MainActivity : FlutterActivity() {
                 }
                 val proxy = ProxySelector.getDefault()
                     ?.select(Uri.parse("https://api.bgm.tv").toJavaUri())
-                    ?.firstOrNull { it.type() == Proxy.Type.HTTP || it.type() == Proxy.Type.SOCKS }
+                    ?.firstOrNull { it.type() == Proxy.Type.HTTP }
                 val address = proxy?.address() as? java.net.InetSocketAddress
                 result.success(
-                    if (address == null) "DIRECT"
-                    else "${if (proxy?.type() == Proxy.Type.SOCKS) "SOCKS5" else "PROXY"} ${address.hostString}:${address.port}"
+                    when {
+                        address != null -> "PROXY ${address.hostString}:${address.port}"
+                        isEmulator() -> "PROXY 10.0.2.2:2080"
+                        else -> "DIRECT"
+                    }
                 )
             }
+    }
+
+    private fun isEmulator(): Boolean {
+        return Build.FINGERPRINT.startsWith("generic") ||
+            Build.FINGERPRINT.startsWith("unknown") ||
+            Build.MODEL.contains("google_sdk") ||
+            Build.MODEL.contains("Emulator") ||
+            Build.MODEL.contains("Android SDK built for x86") ||
+            Build.MANUFACTURER.contains("Genymotion") ||
+            (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")) ||
+            Build.PRODUCT == "google_sdk"
     }
 
     private fun Uri.toJavaUri(): java.net.URI = java.net.URI(toString())

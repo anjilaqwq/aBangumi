@@ -12,7 +12,6 @@ class ProxySettingsPage extends StatefulWidget {
 
 class _ProxySettingsPageState extends State<ProxySettingsPage> {
   late ProxyMode _mode;
-  late ProxyProtocol _protocol;
   late final TextEditingController _host;
   late final TextEditingController _port;
   bool _saving = false;
@@ -23,7 +22,6 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
     super.initState();
     final s = ProxyStore.instance.settings;
     _mode = s.mode;
-    _protocol = s.protocol;
     _host = TextEditingController(text: s.host);
     _port = TextEditingController(text: s.port == 0 ? '' : '${s.port}');
   }
@@ -43,22 +41,20 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
       case ProxyMode.automatic:
         return '自动${ProxyStore.instance.systemProxy == null ? '（未检测到系统代理）' : '（已读取系统代理）'}';
       case ProxyMode.manual:
-        return '${s.protocol == ProxyProtocol.http ? 'HTTP' : 'SOCKS5'} ${s.host}:${s.port}';
+        return 'HTTP ${s.host}:${s.port}';
     }
   }
 
+  ProxySettings _draftSettings() => ProxySettings(
+    mode: _mode,
+    host: _host.text,
+    port: int.tryParse(_port.text.trim()) ?? 0,
+  );
+
   Future<void> _save() async {
-    final port = int.tryParse(_port.text.trim()) ?? 0;
     setState(() => _saving = true);
     try {
-      await ProxyStore.instance.save(
-        ProxySettings(
-          mode: _mode,
-          host: _host.text,
-          port: port,
-          protocol: _protocol,
-        ),
-      );
+      await ProxyStore.instance.save(_draftSettings());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -80,7 +76,7 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
   Future<void> _test() async {
     setState(() => _testing = true);
     try {
-      await ProxyStore.instance.testConnection();
+      await ProxyStore.instance.testConnection(_draftSettings());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -122,24 +118,6 @@ class _ProxySettingsPageState extends State<ProxySettingsPage> {
           ),
           if (manual) ...[
             const SizedBox(height: 24),
-            DropdownButtonFormField<ProxyProtocol>(
-              initialValue: _protocol,
-              decoration: const InputDecoration(labelText: '协议'),
-              items: const [
-                DropdownMenuItem(
-                  value: ProxyProtocol.http,
-                  child: Text('HTTP'),
-                ),
-                DropdownMenuItem(
-                  value: ProxyProtocol.socks5,
-                  child: Text('SOCKS5'),
-                ),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _protocol = v);
-              },
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _host,
               decoration: const InputDecoration(
