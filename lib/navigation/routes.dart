@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../pages/character_page.dart';
 import '../pages/person_page.dart';
+import '../pages/proxy_settings_page.dart';
 import '../pages/subject_detail_page.dart';
 import '../pages/tag_page.dart';
 
@@ -31,4 +32,7 @@ abstract final class AppRoutes {
   /// 跳转标签页。
   static Future<T?> pushTag<T>(BuildContext context, String tag) =>
       Navigator.of(context).push<T>(_route((_) => TagPage(tag: tag)));
+
+  static Future<T?> pushProxySettings<T>(BuildContext context) =>
+      Navigator.of(context).push<T>(_route((_) => const ProxySettingsPage()));
 }

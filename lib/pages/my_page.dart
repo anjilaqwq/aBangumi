@@ -112,7 +112,15 @@ class _LoginViewState extends State<_LoginView> {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
       children: [
         const PageHeader(title: '我的', subtitle: '登录 Bangumi，同步你的收藏与进度。'),
-        const SizedBox(height: 40),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => AppRoutes.pushProxySettings(context),
+            icon: const Icon(Icons.tune, size: 18),
+            label: const Text('代理设置'),
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(
           '使用 Bangumi 官方授权登录，无需输入密码；\n授权完成后将自动返回应用。',
           style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
@@ -505,6 +513,19 @@ class _ProfileViewState extends State<_ProfileView> {
                 style: textTheme.labelMedium?.copyWith(color: AppColors.muted),
               ),
               const Spacer(),
+              TextButton.icon(
+                onPressed: () => AppRoutes.pushProxySettings(context),
+                icon: const Icon(Icons.tune, size: 16),
+                label: const Text('代理'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
               TextButton(
                 onPressed: _confirmLogout,
                 style: TextButton.styleFrom(
