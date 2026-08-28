@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import '../widgets/subject_type_selector.dart';
 import 'subject_detail_page.dart';
@@ -16,39 +18,64 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final _controller = TextEditingController();
   int _type = 2; // 默认动画
+  int _requestGeneration = 0;
   bool _loading = false;
   String _keyword = '';
   List<Subject> _results = [];
   String? _error;
 
-  Future<void> _search() async {
-    final kw = _controller.text.trim();
-    if (kw.isEmpty) return;
+  Future<void> _submitSearch() async {
+    final keyword = _controller.text.trim();
+    if (keyword.isEmpty) return;
+
+    await _search(keyword, type: _type, commitKeyword: true);
+  }
+
+  Future<void> _search(
+    String keyword, {
+    required int type,
+    bool commitKeyword = false,
+    bool clearResults = true,
+  }) async {
+    final generation = ++_requestGeneration;
     setState(() {
       _loading = true;
       _error = null;
-      _results = [];
-      _keyword = kw;
+      if (clearResults) _results = [];
+      if (commitKeyword) _keyword = keyword;
     });
+
     try {
-      final page = await BangumiApi.searchSubjects(kw, type: _type);
-      if (!mounted) return;
+      final page = await BangumiApi.searchSubjects(keyword, type: type);
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _loading = false;
         _results = page.items;
       });
-    } catch (e) {
-      if (!mounted) return;
+    } catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = error.toString();
       });
     }
   }
 
-  void _onTypeChanged(int t) {
-    setState(() => _type = t);
-    if (_keyword.isNotEmpty) _search(); // 已搜索过则按新类型重搜
+  Future<void> _refresh() {
+    final keyword = _keyword;
+    final type = _type;
+    if (keyword.isEmpty) return Future<void>.value();
+    return _search(keyword, type: type, clearResults: false);
+  }
+
+  void _onTypeChanged(int type) {
+    if (type == _type) return;
+
+    final keyword = _keyword;
+    setState(() => _type = type);
+    if (keyword.isNotEmpty) {
+      _search(keyword, type: type);
+    }
   }
 
   @override
@@ -64,21 +91,28 @@ class _SearchPageState extends State<SearchPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
             child: TextField(
               controller: _controller,
               textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _search(),
+              onSubmitted: (_) => _submitSearch(),
               decoration: InputDecoration(
                 hintText: '搜索条目…',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search, color: AppColors.muted),
                 suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward),
-                    onPressed: _search),
+                  icon: const Icon(Icons.arrow_forward),
+                  tooltip: '搜索',
+                  onPressed: _submitSearch,
+                ),
                 filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
+                fillColor: AppColors.paper,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: const BorderSide(color: AppColors.line),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: const BorderSide(color: AppColors.ink),
                 ),
               ),
             ),
@@ -91,36 +125,50 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget _buildBody() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading && _results.isEmpty) {
+      return const LoadingState(message: '正在搜索…');
+    }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('搜索失败：$_error', textAlign: TextAlign.center),
-        ),
-      );
+      return ErrorState(message: '搜索失败：$_error', onRetry: _refresh);
     }
     if (_keyword.isEmpty) {
-      return const Center(
-          child: Text('输入关键词开始搜索', style: TextStyle(color: Colors.grey)));
+      return const EmptyState(message: '输入关键词开始搜索', icon: Icons.search);
     }
     if (_results.isEmpty) {
-      return const Center(
-          child: Text('没有找到相关条目', style: TextStyle(color: Colors.grey)));
+      return _refreshableState(
+        const EmptyState(message: '没有找到相关条目', icon: Icons.search_off),
+      );
     }
-    return ListView.builder(
-      itemCount: _results.length,
-      itemBuilder: (context, i) {
-        final s = _results[i];
-        return SubjectCard(
-          subject: s,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => SubjectDetailPage(subjectId: s.id)),
-          ),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: _results.length,
+        itemBuilder: (context, index) {
+          final subject = _results[index];
+          return SubjectCard(
+            subject: subject,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SubjectDetailPage(subjectId: subject.id),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _refreshableState(Widget state) {
+    return LayoutBuilder(
+      builder: (context, constraints) => RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [SizedBox(height: constraints.maxHeight, child: state)],
+        ),
+      ),
     );
   }
 }

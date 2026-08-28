@@ -13,7 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: 安装 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: 安装 Flutter
         uses: subosito/flutter-action@v2
@@ -25,14 +30,42 @@ jobs:
       - name: 获取依赖
         run: flutter pub get
 
+      - name: 测试 BFF
+        run: npm test --prefix server
+
+      - name: 静态分析
+        run: flutter analyze
+
+      - name: 运行测试
+        run: flutter test
+
+      # 默认不注入 BFF 地址，release 只包含「手动令牌」登录。
+      # 若在仓库 Settings → Secrets and variables → Actions → Variables 配置
+      # 仓库变量 ABANGUMI_AUTH_BASE_URL，本步骤才会通过 --dart-define 注入，
+      # 从而启用 OAuth。未配置时 App 会回退为手动令牌登录。
+      # ABANGUMI_CLIENT_ID 是公开值，可配可不配（不配时使用 App 内置默认值）。
+      # 注意：以上均为仓库「变量」而非密钥；BANGUMI_CLIENT_SECRET 绝不在此出现，
+      # 也不得写入任何仓库变量或密钥。
       - name: 构建 release APK
-        run: flutter build apk --release
+        env:
+          ABANGUMI_AUTH_BASE_URL: ${{ vars.ABANGUMI_AUTH_BASE_URL }}
+          ABANGUMI_CLIENT_ID: ${{ vars.ABANGUMI_CLIENT_ID }}
+        run: |
+          args=""
+          if [ -n "${ABANGUMI_AUTH_BASE_URL}" ]; then
+            args="${args} --dart-define=ABANGUMI_AUTH_BASE_URL=${ABANGUMI_AUTH_BASE_URL}"
+          fi
+          if [ -n "${ABANGUMI_CLIENT_ID}" ]; then
+            args="${args} --dart-define=ABANGUMI_CLIENT_ID=${ABANGUMI_CLIENT_ID}"
+          fi
+          # 以上取值均为 URL/公开 ID，不含空格；未加引号展开是为了拆成独立参数。
+          flutter build apk --release ${args}
 
       - name: 发布到 Releases
         uses: ncipollo/release-action@v1
         with:
-          tag: v1.0.0
-          name: aBangumi v1.0.0
+          tag: v1.1.0
+          name: aBangumi v1.1.0
           artifacts: build/app/outputs/flutter-apk/app-release.apk
           allowUpdates: true
           omitBodyDuringUpdate: true

@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'auth/oauth_service.dart';
 import 'pages/root_page.dart';
 import 'store/auth_store.dart';
+import 'theme/app_theme.dart';
 
 /// 开发环境代理配置。
 ///
@@ -35,6 +37,11 @@ Future<void> main() async {
   HttpOverrides.global = _ProxyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   await AuthStore.instance.init();
+  // Listen for abangumi://oauth/callback deep links (initial + future).
+  OAuthService.instance.bind(
+    AuthStore.instance.handleOAuthCallback,
+    onError: AuthStore.instance.observeOAuthLinkError,
+  );
   runApp(const BgmApp());
 }
 
@@ -44,13 +51,9 @@ class BgmApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bangumi',
+      title: 'aBangumi',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF09199)),
-        scaffoldBackgroundColor: const Color(0xFFF6F7F9),
-      ),
+      theme: AppTheme.light(),
       home: const RootPage(),
     );
   }

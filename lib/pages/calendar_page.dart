@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import 'subject_detail_page.dart';
 
@@ -22,92 +24,120 @@ class _CalendarPageState extends State<CalendarPage> {
     _future = BangumiApi.calendar();
   }
 
-  void _reload() {
-    setState(() {
-      _future = BangumiApi.calendar();
-    });
+  Future<void> _reload() async {
+    final future = BangumiApi.calendar();
+    setState(() => _future = future);
+    await future;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.paper,
       appBar: AppBar(title: const Text('每日放送')),
       body: FutureBuilder<List<CalendarDay>>(
         future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(message: '正在读取放送日程');
           }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('加载失败：${snap.error}', textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    FilledButton(onPressed: _reload, child: const Text('重试')),
-                  ],
-                ),
+          if (snapshot.hasError) {
+            return ErrorState(
+              message: '加载失败：${snapshot.error}',
+              onRetry: _reload,
+            );
+          }
+
+          final days = snapshot.data ?? const [];
+          if (days.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: _reload,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  PageHeader(title: '放送日程', subtitle: '按星期浏览每日更新'),
+                  SizedBox(height: 72),
+                  EmptyState(message: '暂无放送数据'),
+                ],
               ),
             );
           }
-          final days = snap.data ?? const [];
-          if (days.isEmpty) {
-            return const Center(child: Text('暂无数据', style: TextStyle(color: Colors.grey)));
-          }
+
           final selected = days.firstWhere(
-            (d) => d.weekdayId == _selectedWeekday,
+            (day) => day.weekdayId == _selectedWeekday,
             orElse: () => days.first,
           );
           return Column(
             children: [
-              SizedBox(
-                height: 56,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  children: days.map((d) {
-                    final active = d.weekdayId == _selectedWeekday;
-                    final label =
-                        d.cn.isEmpty ? '周${d.weekdayId}' : d.cn.replaceFirst('星期', '周');
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ChoiceChip(
-                        label: Text(label),
-                        selected: active,
-                        onSelected: (_) =>
-                            setState(() => _selectedWeekday = d.weekdayId),
-                      ),
-                    );
-                  }).toList(),
-                ),
+              const PageHeader(
+                title: '放送日程',
+                subtitle: '按星期浏览每日更新',
+                showDivider: false,
               ),
+              _weekdaySelector(days),
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: () async => _reload(),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: selected.items.length,
-                    itemBuilder: (context, i) {
-                      final s = selected.items[i];
-                      return SubjectCard(
-                        subject: s,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => SubjectDetailPage(subjectId: s.id)),
+                  onRefresh: _reload,
+                  child: selected.items.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 96),
+                            EmptyState(message: '本日暂无放送条目'),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(top: 10, bottom: 24),
+                          itemCount: selected.items.length,
+                          itemBuilder: (context, index) {
+                            final subject = selected.items[index];
+                            return SubjectCard(
+                              subject: subject,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SubjectDetailPage(subjectId: subject.id),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
               ),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _weekdaySelector(List<CalendarDay> days) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 52,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            itemCount: days.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final day = days[index];
+              final label = day.cn.isEmpty
+                  ? '周${day.weekdayId}'
+                  : day.cn.replaceFirst('星期', '周');
+              return TagChip(
+                label: label,
+                selected: day.weekdayId == _selectedWeekday,
+                onTap: () => setState(() => _selectedWeekday = day.weekdayId),
+              );
+            },
+          ),
+        ),
+        const HairlineDivider(),
+      ],
     );
   }
 }

@@ -2,22 +2,46 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
+import '../navigation/routes.dart';
 import '../store/auth_store.dart';
-import 'subject_detail_page.dart';
+import '../theme/app_colors.dart';
+import '../widgets/common/common.dart';
 
+/// 「我的」页：日式极简重设计。
+///
+/// - 未登录：OAuth 为主，访问令牌为可折叠的次级入口。
+/// - 已登录：编辑式资料页头 + 收藏列表（分页、筛选、下拉刷新）。
 class MyPage extends StatelessWidget {
   const MyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('我的')),
-      body: ValueListenableBuilder<String?>(
-        valueListenable: AuthStore.instance.token,
-        builder: (context, token, _) {
-          if (token == null || token.isEmpty) return const _LoginView();
-          return const _ProfileView();
-        },
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: Listenable.merge([
+            AuthStore.instance.token,
+            AuthStore.instance.user,
+            AuthStore.instance.busy,
+            AuthStore.instance.error,
+          ]),
+          builder: (context, _) {
+            final token = AuthStore.instance.token.value;
+            final user = AuthStore.instance.user.value;
+            final loggedIn = token != null && token.isNotEmpty;
+            if (!loggedIn) return const _LoginView();
+            if (user == null) {
+              // token 已就绪、用户信息尚未到达的极短窗口。
+              return const LoadingState(message: '正在读取账号信息…');
+            }
+            return _ProfileView(
+              // Never place a credential in widget keys/diagnostics.
+              key: ValueKey(user.username),
+              user: user,
+              token: token,
+            );
+          },
+        ),
       ),
     );
   }
@@ -34,8 +58,10 @@ class _LoginView extends StatefulWidget {
 
 class _LoginViewState extends State<_LoginView> {
   final _controller = TextEditingController();
-  bool _loading = false;
-  String? _error;
+
+  bool _manualBusy = false;
+  bool _manualExpanded = false;
+  String? _manualError;
 
   @override
   void dispose() {
@@ -43,75 +69,171 @@ class _LoginViewState extends State<_LoginView> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _beginOAuth() => AuthStore.instance.beginOAuth();
+
+  Future<void> _manualLogin() async {
+    if (_manualBusy) return;
+    AuthStore.instance.clearError();
     setState(() {
-      _loading = true;
-      _error = null;
+      _manualBusy = true;
+      _manualError = null;
     });
     try {
       await AuthStore.instance.login(_controller.text);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = '登录失败：$e';
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _manualBusy = false;
+        _manualError = _manualErrorMessage(e);
+      });
       return;
     }
-    if (mounted) setState(() => _loading = false);
+    if (!mounted) return;
+    setState(() => _manualBusy = false);
+  }
+
+  String _manualErrorMessage(Object e) {
+    if (e is ApiException) {
+      if (e.statusCode == 0) return '请输入访问令牌。';
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        return '令牌无效或已过期，请重新生成后重试。';
+      }
+      return '无法连接 Bangumi（HTTP ${e.statusCode}），请检查网络后重试。';
+    }
+    return '登录失败，请稍后重试。';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.account_circle_outlined,
-                size: 72, color: Color(0xFFF09199)),
-            const SizedBox(height: 16),
-            const Text('登录 Bangumi',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(
-              '在 bgm.tv 设置页生成访问令牌后粘贴到下方',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                labelText: '访问令牌 (Access Token)',
-                hintText: '粘贴你的 token',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
-              ),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _loading ? null : _login,
-                child: _loading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('登录'),
-              ),
-            ),
-          ],
+    final textTheme = Theme.of(context).textTheme;
+    final oauthBusy = AuthStore.instance.busy.value;
+    final oauthError = AuthStore.instance.error.value;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+      children: [
+        const PageHeader(title: '我的', subtitle: '登录 Bangumi，同步你的收藏与进度。'),
+        const SizedBox(height: 40),
+        Text(
+          '使用 Bangumi 官方授权登录，无需输入密码；\n授权完成后将自动返回应用。',
+          style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
         ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: oauthBusy ? null : _beginOAuth,
+            icon: oauthBusy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.open_in_new, size: 18),
+            label: Text(oauthBusy ? '正在处理登录…' : '使用 Bangumi 账号登录'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '授权服务仅负责登录中转，客户端不保存你的密码。',
+          textAlign: TextAlign.center,
+          style: textTheme.bodySmall,
+        ),
+        if (oauthError != null) ...[
+          const SizedBox(height: 20),
+          _notice(oauthError),
+        ],
+        const SizedBox(height: 40),
+        _orDivider(),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: () => setState(() => _manualExpanded = !_manualExpanded),
+            child: Text(_manualExpanded ? '收起访问令牌登录' : '使用访问令牌登录'),
+          ),
+        ),
+        if (_manualExpanded) ...[
+          const SizedBox(height: 4),
+          TextField(
+            controller: _controller,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+            keyboardType: TextInputType.visiblePassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _manualLogin(),
+            decoration: InputDecoration(
+              labelText: '访问令牌 (Access Token)',
+              hintText: '粘贴你在 bgm.tv 生成的令牌',
+              helperText: '令牌仅保存在本机安全存储中。',
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+                borderSide: BorderSide(color: AppColors.line),
+              ),
+              enabledBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+                borderSide: BorderSide(color: AppColors.line),
+              ),
+            ),
+          ),
+          if (_manualError != null) ...[
+            const SizedBox(height: 12),
+            _notice(_manualError!),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _manualBusy ? null : _manualLogin,
+              child: _manualBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('登录'),
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _orDivider() {
+    return Row(
+      children: [
+        const Expanded(child: HairlineDivider()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('或', style: Theme.of(context).textTheme.labelSmall),
+        ),
+        const Expanded(child: HairlineDivider()),
+      ],
+    );
+  }
+
+  Widget _notice(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Text(
+        message,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
       ),
     );
   }
@@ -120,7 +242,10 @@ class _LoginViewState extends State<_LoginView> {
 // ---------------- 个人资料 + 收藏（分页 + 筛选） ----------------
 
 class _ProfileView extends StatefulWidget {
-  const _ProfileView();
+  final User user;
+  final String token;
+
+  const _ProfileView({super.key, required this.user, required this.token});
 
   @override
   State<_ProfileView> createState() => _ProfileViewState();
@@ -128,15 +253,21 @@ class _ProfileView extends StatefulWidget {
 
 class _ProfileViewState extends State<_ProfileView> {
   static const _pageSize = 50;
+
   final ScrollController _scroll = ScrollController();
+  final Set<int> _seenSubjectIds = {};
 
   int _collectionType = 0; // 0 = 全部（收藏类型）
   int _subjectType = 0; // 0 = 全部（条目类型）
   List<Collection> _items = [];
   int _total = 0;
+  int _loadedRaw = 0; // 已请求到的原始条数，用于分页 offset 推进
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+
+  /// 请求代号：每次刷新/筛选变更时递增，用于丢弃过期的响应。
+  int _requestGen = 0;
 
   @override
   void initState() {
@@ -151,79 +282,101 @@ class _ProfileViewState extends State<_ProfileView> {
     super.dispose();
   }
 
-  User? get _user => AuthStore.instance.user.value;
-  String? get _token => AuthStore.instance.token.value;
-
   void _onScroll() {
+    if (!_scroll.hasClients) return;
     if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 200) {
       _loadMore();
     }
   }
 
+  Future<PageData<Collection>> _fetchPage(int offset) {
+    return BangumiApi.userCollections(
+      widget.token,
+      widget.user.username,
+      collectionType: _collectionType == 0 ? null : _collectionType,
+      subjectType: _subjectType == 0 ? null : _subjectType,
+      limit: _pageSize,
+      offset: offset,
+    );
+  }
+
   Future<void> _load() async {
-    final token = _token;
-    final user = _user;
-    if (token == null || user == null) return;
+    final gen = ++_requestGen;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final page = await BangumiApi.userCollections(
-        token,
-        user.username,
-        collectionType: _collectionType == 0 ? null : _collectionType,
-        subjectType: _subjectType == 0 ? null : _subjectType,
-        limit: _pageSize,
-        offset: 0,
-      );
-      if (!mounted) return;
+      final page = await _fetchPage(0);
+      if (!mounted || gen != _requestGen) return;
       setState(() {
-        _items = page.items;
+        _items = List.of(page.items);
         _total = page.total;
+        _loadedRaw = page.items.length;
+        _seenSubjectIds
+          ..clear()
+          ..addAll(page.items.map((c) => c.subject.id));
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || gen != _requestGen) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = _listErrorMessage(e);
       });
+    }
+  }
+
+  Future<void> _refresh() async {
+    final gen = ++_requestGen;
+    try {
+      final page = await _fetchPage(0);
+      if (!mounted || gen != _requestGen) return;
+      setState(() {
+        _items = List.of(page.items);
+        _total = page.total;
+        _loadedRaw = page.items.length;
+        _seenSubjectIds
+          ..clear()
+          ..addAll(page.items.map((c) => c.subject.id));
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || gen != _requestGen) return;
+      if (_items.isEmpty) {
+        setState(() => _error = _listErrorMessage(e));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_listErrorMessage(e))));
+      }
     }
   }
 
   Future<void> _loadMore() async {
     if (_loading || _loadingMore) return;
-    if (_items.length >= _total) return;
-    final token = _token;
-    final user = _user;
-    if (token == null || user == null) return;
+    if (_loadedRaw >= _total) return;
+    final gen = _requestGen; // 捕获当前代号，不递增
     setState(() => _loadingMore = true);
     try {
-      final page = await BangumiApi.userCollections(
-        token,
-        user.username,
-        collectionType: _collectionType == 0 ? null : _collectionType,
-        subjectType: _subjectType == 0 ? null : _subjectType,
-        limit: _pageSize,
-        offset: _items.length,
-      );
-      if (!mounted) return;
+      final page = await _fetchPage(_loadedRaw);
+      if (!mounted || gen != _requestGen) return;
+      final fresh = page.items
+          .where((c) => !_seenSubjectIds.contains(c.subject.id))
+          .toList();
+      for (final c in fresh) {
+        _seenSubjectIds.add(c.subject.id);
+      }
       setState(() {
-        _items = [..._items, ...page.items];
+        _items = [..._items, ...fresh];
         _total = page.total;
+        _loadedRaw += page.items.length;
         _loadingMore = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _requestGen) return;
       setState(() => _loadingMore = false);
     }
-  }
-
-  void _selectCollectionType(int t) {
-    if (_collectionType == t) return;
-    setState(() => _collectionType = t);
-    _load();
   }
 
   void _selectSubjectType(int t) {
@@ -232,261 +385,329 @@ class _ProfileViewState extends State<_ProfileView> {
     _load();
   }
 
+  void _selectCollectionType(int t) {
+    if (_collectionType == t) return;
+    setState(() => _collectionType = t);
+    _load();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _subjectType = 0;
+      _collectionType = 0;
+    });
+    _load();
+  }
+
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('退出登录'),
+        content: const Text('确定要退出当前账号吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await AuthStore.instance.logout();
+    }
+  }
+
+  String _listErrorMessage(Object e) {
+    if (e is ApiException) {
+      return '加载失败（HTTP ${e.statusCode}），请稍后重试。';
+    }
+    return '加载失败，请稍后重试。';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final user = _user;
-    if (user == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
     return Column(
       children: [
-        _header(user),
-        _chipRow('条目类型', [
-          _chipOption('全部', _subjectType == 0, () => _selectSubjectType(0)),
-          ...kSubjectTypes.map((e) =>
-              _chipOption(e.value, _subjectType == e.key, () => _selectSubjectType(e.key))),
-        ]),
-        _chipRow('收藏状态', [
-          _chipOption('全部', _collectionType == 0, () => _selectCollectionType(0)),
-          ...kCollectionTypes.map((e) => _chipOption(
-              e.value, _collectionType == e.key, () => _selectCollectionType(e.key))),
-        ]),
+        _header(),
+        _filters(),
         Expanded(child: _buildList()),
       ],
     );
   }
 
-  Widget _chipRow(String title, List<Widget> chips) {
+  Widget _header() {
+    final textTheme = Theme.of(context).textTheme;
+    final u = widget.user;
+    final avatarUrl = u.avatarLarge.isNotEmpty ? u.avatarLarge : u.avatarMedium;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 12, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 50,
-            child: Text(title,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-          ),
-          Expanded(
-            child: SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: chips,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CoverImage(
+                imageUrl: avatarUrl,
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                placeholder: const ColoredBox(
+                  color: AppColors.paper,
+                  child: Center(
+                    child: Icon(
+                      Icons.person_outline,
+                      size: 28,
+                      color: AppColors.subtle,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chipOption(String label, bool selected, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: ChoiceChip(
-        label: Text(label),
-        labelStyle: const TextStyle(fontSize: 12),
-        selected: selected,
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        onSelected: (_) => onTap(),
-      ),
-    );
-  }
-
-  Widget _header(User u) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundImage:
-                u.avatarLarge.isNotEmpty ? NetworkImage(u.avatarLarge) : null,
-            child: u.avatarLarge.isEmpty ? const Icon(Icons.person) : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(u.displayName,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Text('@${u.username}',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                    Text(u.displayName, style: textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      '@${u.username}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.subtle,
+                      ),
+                    ),
+                    if (u.sign.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        u.sign,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                if (u.sign.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(u.sign,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[700])),
-                ],
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Text(
+                '收藏 $_total',
+                style: textTheme.labelMedium?.copyWith(color: AppColors.muted),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: _confirmLogout,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('退出登录'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const HairlineDivider(),
+        ],
+      ),
+    );
+  }
+
+  Widget _filters() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: [
+          _filterRow('条目', [
+            _filterTag('全部', _subjectType == 0, () => _selectSubjectType(0)),
+            ...kSubjectTypes.map(
+              (e) => _filterTag(
+                e.value,
+                _subjectType == e.key,
+                () => _selectSubjectType(e.key),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          _filterRow('收藏', [
+            _filterTag(
+              '全部',
+              _collectionType == 0,
+              () => _selectCollectionType(0),
+            ),
+            ...kCollectionTypes.map(
+              (e) => _filterTag(
+                e.value,
+                _collectionType == e.key,
+                () => _selectCollectionType(e.key),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          const HairlineDivider(),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterRow(String label, List<Widget> chips) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(label, style: Theme.of(context).textTheme.labelSmall),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.grey),
-            tooltip: '退出登录',
-            onPressed: () => AuthStore.instance.logout(),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: chips),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _filterTag(String label, bool selected, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: TagChip(label: label, selected: selected, onTap: onTap),
     );
   }
 
   Widget _buildList() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingState(message: '正在加载收藏…');
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('加载失败：$_error', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('重试')),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
     if (_items.isEmpty) {
-      return const Center(
-          child: Text('这里空空如也', style: TextStyle(color: Colors.grey)));
+      final filtered = _subjectType != 0 || _collectionType != 0;
+      return EmptyState(
+        message: '这里空空如也',
+        actionLabel: filtered ? '重置筛选' : null,
+        onAction: filtered ? _resetFilters : null,
+      );
     }
+    final hasMore = _loadedRaw < _total;
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView.builder(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: _items.length + 1,
         itemBuilder: (context, i) {
-          if (i < _items.length) return _collectionTile(_items[i]);
-          if (_loadingMore) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
+          if (i < _items.length) {
+            return Column(
+              children: [
+                _collectionRow(_items[i]),
+                const HairlineDivider(indent: 24, endIndent: 24),
+              ],
             );
           }
-          if (_items.length >= _total) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  '已加载全部 $_total 条',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-              ),
-            );
-          }
-          return const SizedBox(height: 40);
+          return PagingFooter(
+            loading: _loadingMore,
+            hasMore: hasMore,
+            total: _total,
+          );
         },
       ),
     );
   }
 
-  Widget _collectionTile(Collection c) {
+  Widget _collectionRow(Collection c) {
+    final textTheme = Theme.of(context).textTheme;
     final s = c.subject;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => SubjectDetailPage(subjectId: s.id)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: s.cover.isNotEmpty
-                    ? Image.network(
-                        s.cover,
-                        width: 56,
-                        height: 78,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _coverPlaceholder(),
-                      )
-                    : _coverPlaceholder(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(s.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _chip(c.typeLabel),
-                        if (c.rate > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: _chip('评分 ${c.rate}'),
-                          ),
-                        if (c.isPrivate)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 6),
-                            child: Icon(Icons.lock_outline,
-                                size: 14, color: Colors.grey),
-                          ),
-                      ],
-                    ),
-                    if (c.comment.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(c.comment,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600])),
+    return InkWell(
+      onTap: () => AppRoutes.pushSubject(context, s.id),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CoverImage(
+              imageUrl: s.cover,
+              width: 52,
+              height: 72,
+              borderRadius: 3,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _meta(c.typeLabel),
+                      if (c.rate > 0) _meta('评分 ${c.rate}'),
+                      if (c.isPrivate)
+                        const Icon(
+                          Icons.lock_outline,
+                          size: 13,
+                          color: AppColors.subtle,
+                        ),
+                      if (c.updatedAt.isNotEmpty)
+                        _meta(_shortDate(c.updatedAt)),
+                    ],
+                  ),
+                  if (c.comment.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      c.comment,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.muted,
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _coverPlaceholder() => Container(
-        width: 56,
-        height: 78,
-        color: Colors.grey[300],
-        child: const Icon(Icons.image_not_supported_outlined,
-            color: Colors.grey, size: 20),
-      );
+  Widget _meta(String text) {
+    return Text(
+      text,
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: AppColors.subtle),
+    );
+  }
 
-  Widget _chip(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(text, style: const TextStyle(fontSize: 11)),
-      );
+  String _shortDate(String s) => s.length >= 10 ? s.substring(0, 10) : s;
 }
