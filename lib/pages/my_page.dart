@@ -4,6 +4,7 @@ import '../api/bangumi_api.dart';
 import '../models/models.dart';
 import '../navigation/routes.dart';
 import '../store/auth_store.dart';
+import '../store/theme_store.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
 
@@ -114,10 +115,19 @@ class _LoginViewState extends State<_LoginView> {
         const PageHeader(title: '我的', subtitle: '登录 Bangumi，同步你的收藏与进度。'),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => AppRoutes.pushProxySettings(context),
-            icon: const Icon(Icons.tune, size: 18),
-            label: const Text('代理设置'),
+          child: Wrap(
+            children: [
+              TextButton.icon(
+                onPressed: ThemeStore.instance.cycleThemeMode,
+                icon: const Icon(Icons.dark_mode_outlined, size: 18),
+                label: const Text('外观'),
+              ),
+              TextButton.icon(
+                onPressed: () => AppRoutes.pushProxySettings(context),
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('代理设置'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
@@ -513,6 +523,12 @@ class _ProfileViewState extends State<_ProfileView> {
                 style: textTheme.labelMedium?.copyWith(color: AppColors.muted),
               ),
               const Spacer(),
+              IconButton(
+                onPressed: ThemeStore.instance.cycleThemeMode,
+                tooltip: '外观',
+                icon: const Icon(Icons.dark_mode_outlined, size: 18),
+                visualDensity: VisualDensity.compact,
+              ),
               TextButton.icon(
                 onPressed: () => AppRoutes.pushProxySettings(context),
                 icon: const Icon(Icons.tune, size: 16),
@@ -569,7 +585,9 @@ class _ProfileViewState extends State<_ProfileView> {
               _collectionType == 0,
               () => _selectCollectionType(0),
             ),
-            ...kCollectionTypes.map(
+            ...collectionTypesForSubjectType(
+              _subjectType == 0 ? null : _subjectType,
+            ).map(
               (e) => _filterTag(
                 e.value,
                 _collectionType == e.key,
@@ -701,6 +719,10 @@ class _ProfileViewState extends State<_ProfileView> {
                         _meta(_shortDate(c.updatedAt)),
                     ],
                   ),
+                  if (s.type == 2 && c.type == 2 && s.totalEpisodes > 0) ...[
+                    const SizedBox(height: 10),
+                    _animeProgress(c),
+                  ],
                   if (c.comment.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -718,6 +740,38 @@ class _ProfileViewState extends State<_ProfileView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _animeProgress(Collection collection) {
+    final total = collection.subject.totalEpisodes;
+    final watched = collection.epStatus.clamp(0, total).toInt();
+    final progress = total == 0 ? 0.0 : watched / total;
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('观看进度', style: Theme.of(context).textTheme.bodySmall),
+            const Spacer(),
+            Text(
+              '$watched/$total',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 4,
+            backgroundColor: colors.outlineVariant,
+            color: colors.primary,
+          ),
+        ),
+      ],
     );
   }
 

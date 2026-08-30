@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../store/auth_store.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
+import '../widgets/subject_community_preview.dart';
 import 'character_page.dart';
 import 'tag_page.dart';
 
@@ -83,6 +84,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
               _content(s),
               _RelatedSection(subjectId: s.id),
               _charactersSection(_charactersFuture),
+              SubjectCommunityPreview(subjectId: s.id, subjectType: s.type),
               _EpisodesSection(tracker: _tracker),
             ],
           );
@@ -97,7 +99,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CollectionBar(subjectId: s.id),
+          _CollectionBar(subjectId: s.id, subjectType: s.type),
           const SizedBox(height: 16),
           _EpisodeProgressBar(tracker: _tracker),
           if (s.tags.isNotEmpty) ...[
@@ -121,7 +123,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
           ],
           if (s.infobox.isNotEmpty) ...[
             const SizedBox(height: 24),
-            InfoBox(
+            _CollapsibleInfoBox(
               entries: s.infobox.map((e) => InfoEntry(e.key, e.value)).toList(),
             ),
           ],
@@ -129,10 +131,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
             const SizedBox(height: 28),
             Text('简介', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 10),
-            Text(
-              s.summary.trim(),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            _CollapsibleSummary(text: s.summary.trim()),
           ],
         ],
       ),
@@ -150,7 +149,7 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
           children: [
             SectionHeader(title: '角色', count: '${list.length}'),
             SizedBox(
-              height: 148,
+              height: 220,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 scrollDirection: Axis.horizontal,
@@ -166,13 +165,14 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
                       ),
                     ),
                     child: SizedBox(
-                      width: 82,
+                      width: 96,
                       child: Column(
                         children: [
                           CoverImage(
                             imageUrl: c.imagesLarge,
-                            width: 60,
-                            height: 72,
+                            width: 72,
+                            height: 144,
+                            alignment: Alignment.topCenter,
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -210,6 +210,79 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
   }
 }
 
+class _CollapsibleInfoBox extends StatefulWidget {
+  final List<InfoEntry> entries;
+  const _CollapsibleInfoBox({required this.entries});
+
+  @override
+  State<_CollapsibleInfoBox> createState() => _CollapsibleInfoBoxState();
+}
+
+class _CollapsibleInfoBoxState extends State<_CollapsibleInfoBox> {
+  static const _collapsedCount = 5;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final collapsible = widget.entries.length > _collapsedCount;
+    final visible = _expanded || !collapsible
+        ? widget.entries
+        : widget.entries.take(_collapsedCount).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InfoBox(entries: visible),
+        if (collapsible)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(_expanded ? '收起详细信息' : '查看全部信息'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CollapsibleSummary extends StatefulWidget {
+  final String text;
+  const _CollapsibleSummary({required this.text});
+
+  @override
+  State<_CollapsibleSummary> createState() => _CollapsibleSummaryState();
+}
+
+class _CollapsibleSummaryState extends State<_CollapsibleSummary> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final collapsible = widget.text.length > 240;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.text,
+          maxLines: _expanded || !collapsible ? null : 6,
+          overflow: _expanded || !collapsible
+              ? TextOverflow.visible
+              : TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        if (collapsible)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(_expanded ? '收起简介' : '展开简介'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _Score extends StatelessWidget {
   final double score;
   final int total;
@@ -239,7 +312,8 @@ class _Score extends StatelessWidget {
 
 class _CollectionBar extends StatefulWidget {
   final int subjectId;
-  const _CollectionBar({required this.subjectId});
+  final int subjectType;
+  const _CollectionBar({required this.subjectId, required this.subjectType});
 
   @override
   State<_CollectionBar> createState() => _CollectionBarState();
@@ -303,8 +377,11 @@ class _CollectionBarState extends State<_CollectionBar> {
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) =>
-          _CollectionEditorSheet(subjectId: widget.subjectId, initial: _col),
+      builder: (_) => _CollectionEditorSheet(
+        subjectId: widget.subjectId,
+        subjectType: widget.subjectType,
+        initial: _col,
+      ),
     );
     if (changed == true && mounted) {
       await _load();
@@ -405,8 +482,13 @@ class _CollectionBarState extends State<_CollectionBar> {
 
 class _CollectionEditorSheet extends StatefulWidget {
   final int subjectId;
+  final int subjectType;
   final Collection? initial;
-  const _CollectionEditorSheet({required this.subjectId, this.initial});
+  const _CollectionEditorSheet({
+    required this.subjectId,
+    required this.subjectType,
+    this.initial,
+  });
 
   @override
   State<_CollectionEditorSheet> createState() => _CollectionEditorSheetState();
@@ -478,7 +560,7 @@ class _CollectionEditorSheetState extends State<_CollectionEditorSheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: kCollectionTypes
+              children: collectionTypesForSubjectType(widget.subjectType)
                   .map(
                     (e) => ChoiceChip(
                       label: Text(e.value),

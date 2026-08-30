@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import 'common/common.dart';
 
 /// 条目卡片：无边框、无阴影的编辑部列表行，底部以细线分隔。
@@ -18,73 +17,81 @@ class SubjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     final rankValue = rank;
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+        padding: const EdgeInsets.only(top: 14),
         child: Column(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (rankValue != null) ...[
-                  SizedBox(width: 30, child: _rankText(context, rankValue)),
-                  const SizedBox(width: 12),
-                ],
-                CoverImage(
-                  imageUrl: subject.cover,
-                  width: 56,
-                  height: 78,
-                  borderRadius: 2,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subject.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleSmall,
-                      ),
-                      if (subject.originalTitle.isNotEmpty &&
-                          subject.originalTitle != subject.title) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          subject.originalTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: AppColors.muted),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        _metaText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: AppColors.subtle),
-                      ),
-                      if (subject.tags.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          subject.tags.take(3).join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: AppColors.subtle),
-                        ),
-                      ],
-                    ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (rankValue != null) ...[
+                    SizedBox(width: 30, child: _rankText(context, rankValue)),
+                    const SizedBox(width: 12),
+                  ],
+                  CoverImage(
+                    imageUrl: subject.cover,
+                    width: 56,
+                    height: 78,
+                    borderRadius: 2,
                   ),
-                ),
-                const SizedBox(width: 10),
-                _score(context, subject.score),
-              ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          subject.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleSmall,
+                        ),
+                        if (subject.originalTitle.isNotEmpty &&
+                            subject.originalTitle != subject.title) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subject.originalTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          _metaText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        if (subject.tags.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            subject.tags.take(3).join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _score(context, subject.score),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             const HairlineDivider(),
@@ -104,11 +111,13 @@ class SubjectCard extends StatelessWidget {
   }
 
   Widget _rankText(BuildContext context, int rank) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     return Text(
       rank < 10 ? '0$rank' : '$rank',
       style: textTheme.titleMedium?.copyWith(
-        color: AppColors.ink,
+        color: colors.onSurface,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.5,
       ),
@@ -116,7 +125,9 @@ class SubjectCard extends StatelessWidget {
   }
 
   Widget _score(BuildContext context, double score) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     if (score <= 0) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -124,14 +135,14 @@ class SubjectCard extends StatelessWidget {
         Text(
           score.toStringAsFixed(1),
           style: textTheme.titleMedium?.copyWith(
-            color: AppColors.vermilion,
+            color: colors.primary,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           '评分',
-          style: textTheme.bodySmall?.copyWith(color: AppColors.subtle),
+          style: textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
         ),
       ],
     );

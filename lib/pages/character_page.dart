@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
 import '../widgets/ref_tiles.dart';
 import 'person_page.dart';
@@ -43,7 +42,7 @@ class _CharacterPageState extends State<CharacterPage> {
       builder: (context, snapshot) {
         final character = snapshot.data;
         return Scaffold(
-          backgroundColor: AppColors.paper,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           appBar: AppBar(title: Text(character?.title ?? '角色详情')),
           body: _body(snapshot),
         );
@@ -68,6 +67,7 @@ class _CharacterPageState extends State<CharacterPage> {
       children: [
         DetailHero(
           coverUrl: character.imagesLarge,
+          coverAlignment: Alignment.topCenter,
           title: character.title,
           subtitle:
               character.name.isNotEmpty && character.name != character.title
@@ -102,7 +102,7 @@ class _CharacterPageState extends State<CharacterPage> {
             child: Text(
               character.summary.trim(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.ink,
+                color: Theme.of(context).colorScheme.onSurface,
                 height: 1.8,
               ),
             ),

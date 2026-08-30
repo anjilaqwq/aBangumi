@@ -76,7 +76,46 @@ class ProxyStore extends ChangeNotifier {
     } on PlatformException {
       _systemProxy = null;
     }
+    _systemProxy ??= await _discoverLocalHttpProxy();
     notifyListeners();
+  }
+
+  Future<String?> _discoverLocalHttpProxy() async {
+    const ports = [2080, 2081, 7890, 10809, 1080, 8080];
+    for (final port in ports) {
+      Socket? socket;
+      try {
+        socket = await Socket.connect(
+          InternetAddress.loopbackIPv4,
+          port,
+          timeout: const Duration(milliseconds: 350),
+        );
+      } on Object {
+        continue;
+      } finally {
+        socket?.destroy();
+      }
+
+      final proxy = 'PROXY 127.0.0.1:$port';
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 4)
+        ..findProxy = (_) => proxy;
+      try {
+        final request = await client.getUrl(
+          Uri.parse('https://api.bgm.tv/calendar'),
+        );
+        final response = await request.close();
+        await response.drain<void>();
+        if (response.statusCode >= 200 && response.statusCode < 400) {
+          return proxy;
+        }
+      } on Object {
+        // 端口可能是纯 SOCKS 或其他本地服务，继续检查下一个端口。
+      } finally {
+        client.close(force: true);
+      }
+    }
+    return null;
   }
 
   Future<void> save(ProxySettings value) async {

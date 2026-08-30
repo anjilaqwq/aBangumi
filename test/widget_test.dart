@@ -21,7 +21,12 @@ void main() {
       ],
       'infobox': [
         {'key': '中文名', 'value': '星际牛仔'},
-        {'key': '别名', 'value': [{'v': 'Cowboy Bebop'}]},
+        {
+          'key': '别名',
+          'value': [
+            {'v': 'Cowboy Bebop'},
+          ],
+        },
       ],
       'total_episodes': 26,
       'collection': {'doing': 4111},
@@ -47,5 +52,27 @@ void main() {
     expect(subjectTypeLabel(4), '游戏');
     expect(subjectTypeLabel(6), '三次元');
     expect(subjectTypeLabel(99), '条目');
+  });
+
+  test('收藏状态按条目类型显示', () {
+    expect(collectionTypeLabel(1, subjectType: 2), '想看');
+    expect(collectionTypeLabel(3, subjectType: 1), '在读');
+    expect(collectionTypeLabel(2, subjectType: 3), '听过');
+    expect(collectionTypeLabel(3, subjectType: 4), '在玩');
+    expect(collectionTypeLabel(4, subjectType: 4), '搁置');
+  });
+
+  test('Collection 解析动画观看进度', () {
+    final collection = Collection.fromJson({
+      'type': 2,
+      'rate': 8,
+      'ep_status': '7',
+      'vol_status': 0,
+      'private': false,
+      'subject': {'id': 1, 'type': 2, 'name_cn': '测试动画', 'total_episodes': 12},
+    });
+    expect(collection.typeLabel, '看过');
+    expect(collection.epStatus, 7);
+    expect(collection.subject.totalEpisodes, 12);
   });
 }

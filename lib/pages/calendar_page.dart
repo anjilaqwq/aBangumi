@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import 'subject_detail_page.dart';
@@ -33,7 +32,7 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(title: const Text('每日放送')),
       body: FutureBuilder<List<CalendarDay>>(
         future: _future,

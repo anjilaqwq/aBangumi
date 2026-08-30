@@ -154,6 +154,74 @@ abstract final class AppTheme {
     );
   }
 
+  static ThemeData dark() {
+    const paper = Color(0xFF24241F);
+    const raised = Color(0xFF30302A);
+    const ink = Color(0xFFF2EEE4);
+    const muted = Color(0xFFC8C1B4);
+    const line = Color(0xFF57574E);
+    const scheme = ColorScheme.dark(
+      primary: AppColors.vermilion,
+      onPrimary: Colors.white,
+      primaryContainer: Color(0xFF452426),
+      onPrimaryContainer: ink,
+      secondary: muted,
+      onSecondary: paper,
+      secondaryContainer: raised,
+      onSecondaryContainer: ink,
+      surface: paper,
+      onSurface: ink,
+      surfaceContainerHighest: raised,
+      onSurfaceVariant: muted,
+      outline: line,
+      outlineVariant: line,
+      shadow: Colors.transparent,
+      scrim: Colors.black,
+    );
+    final base = light();
+    return base.copyWith(
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: paper,
+      canvasColor: paper,
+      textTheme: base.textTheme.apply(bodyColor: ink, displayColor: ink),
+      iconTheme: const IconThemeData(color: ink),
+      primaryIconTheme: const IconThemeData(color: ink),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: paper,
+        foregroundColor: ink,
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(color: ink),
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: paper,
+        shape: const RoundedRectangleBorder(
+          borderRadius: kRestrainedRadius,
+          side: BorderSide(color: line),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(color: line, thickness: 1, space: 1),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: paper,
+        selectedColor: raised,
+        side: const BorderSide(color: line),
+        labelStyle: base.chipTheme.labelStyle?.copyWith(color: ink),
+        secondaryLabelStyle: base.chipTheme.secondaryLabelStyle?.copyWith(
+          color: ink,
+        ),
+      ),
+      bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
+        backgroundColor: paper,
+        selectedItemColor: AppColors.vermilion,
+        unselectedItemColor: muted,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.vermilion,
+        linearTrackColor: line,
+        circularTrackColor: line,
+      ),
+    );
+  }
+
   /// 衬线正文与标题：标题字重 ≤ 500，正文行高宽裕（「間」）。
   static TextTheme _textTheme() {
     return const TextTheme(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import '../widgets/subject_type_selector.dart';
@@ -86,6 +85,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('搜索')),
       body: Column(
@@ -98,21 +98,21 @@ class _SearchPageState extends State<SearchPage> {
               onSubmitted: (_) => _submitSearch(),
               decoration: InputDecoration(
                 hintText: '搜索条目…',
-                prefixIcon: const Icon(Icons.search, color: AppColors.muted),
+                prefixIcon: Icon(Icons.search, color: colors.onSurfaceVariant),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.arrow_forward),
                   tooltip: '搜索',
                   onPressed: _submitSearch,
                 ),
                 filled: true,
-                fillColor: AppColors.paper,
+                fillColor: colors.surface,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(4),
-                  borderSide: const BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: colors.outlineVariant),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(4),
-                  borderSide: const BorderSide(color: AppColors.ink),
+                  borderSide: BorderSide(color: colors.onSurface),
                 ),
               ),
             ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
 import '../widgets/subject_card.dart';
 import '../widgets/subject_type_selector.dart';
@@ -42,7 +41,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final typeLabel = subjectTypeLabel(_type);
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(title: const Text('排行榜')),
       body: Column(
         children: [

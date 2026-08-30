@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../pages/character_page.dart';
 import '../pages/person_page.dart';
 import '../pages/proxy_settings_page.dart';
+import '../pages/subject_community_page.dart';
 import '../pages/subject_detail_page.dart';
+import '../pages/subject_topic_page.dart';
 import '../pages/tag_page.dart';
 
 /// 页面导航辅助：统一跳转入口，避免各处散落的 `MaterialPageRoute`。
@@ -35,4 +38,42 @@ abstract final class AppRoutes {
 
   static Future<T?> pushProxySettings<T>(BuildContext context) =>
       Navigator.of(context).push<T>(_route((_) => const ProxySettingsPage()));
+
+  static Future<T?> pushSubjectTopic<T>(BuildContext context, int topicId) =>
+      Navigator.of(
+        context,
+      ).push<T>(_route((_) => SubjectTopicPage(topicId: topicId)));
+
+  static Future<T?> pushSubjectCommunity<T>(
+    BuildContext context, {
+    required int subjectId,
+    required int subjectType,
+    int initialTab = 0,
+  }) => Navigator.of(context).push<T>(
+    _route(
+      (_) => SubjectCommunityPage(
+        subjectId: subjectId,
+        subjectType: subjectType,
+        initialTab: initialTab,
+      ),
+    ),
+  );
+
+  static Future<void> openSubjectTopic(BuildContext context, int topicId) =>
+      _openExternal(
+        context,
+        Uri.parse('https://bgm.tv/subject/topic/$topicId'),
+      );
+
+  static Future<void> openBlog(BuildContext context, int blogId) =>
+      _openExternal(context, Uri.parse('https://bgm.tv/blog/$blogId'));
+
+  static Future<void> _openExternal(BuildContext context, Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('无法打开链接')));
+    }
+  }
 }

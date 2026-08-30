@@ -17,7 +17,7 @@ class ApiException implements Exception {
 class BangumiApi {
   static const String baseUrl = 'https://api.bgm.tv';
   static const String _ua =
-      'aBangumi/1.1.0 (https://github.com/anjilaqwq/aBangumi)';
+      'aBangumi/1.1.1 (https://github.com/anjilaqwq/aBangumi)';
 
   static Map<String, String> _headers({String? token}) => {
     'User-Agent': _ua,

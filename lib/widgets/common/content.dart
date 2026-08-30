@@ -9,6 +9,7 @@ class CoverImage extends StatelessWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  final AlignmentGeometry alignment;
   final double borderRadius;
   final Widget? placeholder;
 
@@ -18,21 +19,23 @@ class CoverImage extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.borderRadius = 4,
     this.placeholder,
   });
 
   @override
   Widget build(BuildContext context) {
-    final fallback = placeholder ?? _placeholder();
+    final colors = Theme.of(context).colorScheme;
+    final fallback = placeholder ?? _placeholder(context);
     return Container(
       width: width,
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.line,
+        color: colors.outlineVariant,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: imageUrl.isEmpty
           ? fallback
@@ -41,16 +44,22 @@ class CoverImage extends StatelessWidget {
               width: width,
               height: height,
               fit: fit,
+              alignment: alignment,
               errorBuilder: (_, __, ___) => fallback,
             ),
     );
   }
 
-  Widget _placeholder() {
-    return const ColoredBox(
-      color: AppColors.paper,
+  Widget _placeholder(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colors.surface,
       child: Center(
-        child: Icon(Icons.image_outlined, size: 24, color: AppColors.subtle),
+        child: Icon(
+          Icons.image_outlined,
+          size: 24,
+          color: colors.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -79,14 +88,16 @@ class InfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.paper,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,11 +138,13 @@ class TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     final text = Text(
       label,
       style: (selected ? textTheme.labelMedium : textTheme.bodySmall)?.copyWith(
-        color: selected ? AppColors.vermilion : AppColors.muted,
+        color: selected ? colors.primary : colors.onSurfaceVariant,
       ),
     );
     final content = Padding(
@@ -139,10 +152,10 @@ class TagChip extends StatelessWidget {
       child: text,
     );
     final decoration = BoxDecoration(
-      color: selected ? const Color(0xFFF6E9E6) : AppColors.paper,
+      color: selected ? colors.primaryContainer : colors.surface,
       borderRadius: BorderRadius.circular(3),
       border: Border.all(
-        color: selected ? AppColors.vermilion : AppColors.line,
+        color: selected ? colors.primary : colors.outlineVariant,
       ),
     );
 
@@ -169,6 +182,7 @@ class DetailHero extends StatelessWidget {
   final Widget? trailing;
   final double coverWidth;
   final double coverHeight;
+  final AlignmentGeometry coverAlignment;
   final EdgeInsetsGeometry padding;
   final bool showDivider;
 
@@ -181,6 +195,7 @@ class DetailHero extends StatelessWidget {
     this.trailing,
     this.coverWidth = 96,
     this.coverHeight = 132,
+    this.coverAlignment = Alignment.center,
     this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 0),
     this.showDivider = true,
   });
@@ -200,6 +215,7 @@ class DetailHero extends StatelessWidget {
                 imageUrl: coverUrl,
                 width: coverWidth,
                 height: coverHeight,
+                alignment: coverAlignment,
               ),
               const SizedBox(width: 16),
               Expanded(

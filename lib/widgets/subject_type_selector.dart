@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import '../theme/app_colors.dart';
 import 'common/common.dart';
 
 /// 条目类型选择：横向克制的文字标签，选中项以朱红短线标记，底部细线收束。
@@ -66,7 +65,9 @@ class _Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colors = theme.colorScheme;
     return SizedBox(
       height: 44,
       child: InkWell(
@@ -78,7 +79,7 @@ class _Tab extends StatelessWidget {
               label,
               style: (active ? textTheme.titleSmall : textTheme.bodyMedium)
                   ?.copyWith(
-                    color: active ? AppColors.ink : AppColors.muted,
+                    color: active ? colors.onSurface : colors.onSurfaceVariant,
                     fontWeight: active ? FontWeight.w500 : FontWeight.w400,
                   ),
             ),
@@ -86,7 +87,7 @@ class _Tab extends StatelessWidget {
             SizedBox(
               height: 2,
               width: 18,
-              child: active ? const ColoredBox(color: AppColors.vermilion) : null,
+              child: active ? ColoredBox(color: colors.primary) : null,
             ),
           ],
         ),

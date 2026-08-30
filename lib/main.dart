@@ -8,6 +8,7 @@ import 'store/proxy_store.dart';
 import 'auth/oauth_service.dart';
 import 'pages/root_page.dart';
 import 'store/auth_store.dart';
+import 'store/theme_store.dart';
 import 'theme/app_theme.dart';
 
 /// Android 无系统代理时保留 debug 模拟器宿主机回退。
@@ -40,6 +41,7 @@ Future<void> main() async {
   await ProxyStore.instance.init();
   HttpOverrides.global = _ProxyHttpOverrides();
   await AuthStore.instance.init();
+  await ThemeStore.instance.init();
   // Listen for abangumi://oauth/callback deep links (initial + future).
   OAuthService.instance.bind(
     AuthStore.instance.handleOAuthCallback,
@@ -53,11 +55,16 @@ class BgmApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'aBangumi',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      home: const RootPage(),
+    return ListenableBuilder(
+      listenable: ThemeStore.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'aBangumi',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeStore.instance.themeMode,
+        home: const RootPage(),
+      ),
     );
   }
 }

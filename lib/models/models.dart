@@ -9,6 +9,15 @@ String _numStr(dynamic v) {
   return v.toString();
 }
 
+int _intValue(dynamic value) {
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final text = value.trim();
+    return int.tryParse(text) ?? double.tryParse(text)?.toInt() ?? 0;
+  }
+  return 0;
+}
+
 String subjectTypeLabel(int type) {
   switch (type) {
     case 1:
@@ -26,22 +35,25 @@ String subjectTypeLabel(int type) {
   }
 }
 
-String collectionTypeLabel(int type) {
-  switch (type) {
-    case 1:
-      return '想看';
-    case 2:
-      return '看过';
-    case 3:
-      return '在看';
-    case 4:
-      return '搁置';
-    case 5:
-      return '抛弃';
-    default:
-      return '未收藏';
-  }
+String collectionTypeLabel(int type, {int? subjectType}) {
+  if (type == 4) return '搁置';
+  if (type == 5) return '抛弃';
+
+  final labels = switch (subjectType) {
+    1 => const ['想读', '读过', '在读'],
+    3 => const ['想听', '听过', '在听'],
+    4 => const ['想玩', '玩过', '在玩'],
+    _ => const ['想看', '看过', '在看'],
+  };
+  return type >= 1 && type <= 3 ? labels[type - 1] : '未收藏';
 }
+
+/// 当前条目类型可用的收藏状态。搁置和抛弃在所有类型中保持一致。
+List<MapEntry<int, String>> collectionTypesForSubjectType(int? subjectType) =>
+    List.unmodifiable([
+      for (var type = 1; type <= 5; type++)
+        MapEntry(type, collectionTypeLabel(type, subjectType: subjectType)),
+    ]);
 
 /// 条目类型（用于切换）
 const List<MapEntry<int, String>> kSubjectTypes = [
@@ -114,16 +126,19 @@ class Subject {
       imagesLarge: _https(images['large']?.toString() ?? ''),
       imagesCommon: _https(images['common']?.toString() ?? ''),
       score: (rating['score'] as num?)?.toDouble() ?? 0,
-      rank: (rating['rank'] as num?)?.toInt() ??
+      rank:
+          (rating['rank'] as num?)?.toInt() ??
           (j['rank'] as num?)?.toInt() ??
           0,
       ratingTotal: (rating['total'] as num?)?.toInt() ?? 0,
-      tags: (j['tags'] as List?)
+      tags:
+          (j['tags'] as List?)
               ?.map((e) => (e as Map)['name']?.toString() ?? '')
               .where((s) => s.isNotEmpty)
               .toList() ??
           const [],
-      infobox: (j['infobox'] as List?)
+      infobox:
+          (j['infobox'] as List?)
               ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -151,10 +166,12 @@ class InfoItem {
     final v = j['value'];
     String s;
     if (v is List) {
-      s = v.map((e) {
-        if (e is Map) return (e['v'] ?? e['k'] ?? '').toString();
-        return e.toString();
-      }).join(' / ');
+      s = v
+          .map((e) {
+            if (e is Map) return (e['v'] ?? e['k'] ?? '').toString();
+            return e.toString();
+          })
+          .join(' / ');
     } else {
       s = v?.toString() ?? '';
     }
@@ -182,14 +199,14 @@ class Episode {
   });
 
   factory Episode.fromJson(Map<String, dynamic> j) => Episode(
-        id: (j['id'] as num?)?.toInt() ?? 0,
-        sort: (j['sort'] as num?)?.toInt() ?? 0,
-        ep: (j['ep'] as num?)?.toDouble() ?? 0,
-        comment: (j['comment'] as num?)?.toInt() ?? 0,
-        name: j['name']?.toString() ?? '',
-        nameCn: j['name_cn']?.toString() ?? '',
-        airdate: j['airdate']?.toString() ?? '',
-      );
+    id: (j['id'] as num?)?.toInt() ?? 0,
+    sort: (j['sort'] as num?)?.toInt() ?? 0,
+    ep: (j['ep'] as num?)?.toDouble() ?? 0,
+    comment: (j['comment'] as num?)?.toInt() ?? 0,
+    name: j['name']?.toString() ?? '',
+    nameCn: j['name_cn']?.toString() ?? '',
+    airdate: j['airdate']?.toString() ?? '',
+  );
 
   String get title => nameCn.isNotEmpty ? nameCn : name;
 
@@ -221,7 +238,8 @@ class CalendarDay {
       weekdayId: (w['id'] as num?)?.toInt() ?? 0,
       cn: w['cn']?.toString() ?? '',
       en: w['en']?.toString() ?? '',
-      items: (j['items'] as List?)
+      items:
+          (j['items'] as List?)
               ?.map((e) => Subject.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -271,6 +289,8 @@ class Collection {
   final String comment;
   final String updatedAt;
   final bool isPrivate;
+  final int epStatus;
+  final int volStatus;
 
   Collection({
     required this.subject,
@@ -279,19 +299,24 @@ class Collection {
     required this.comment,
     required this.updatedAt,
     required this.isPrivate,
+    this.epStatus = 0,
+    this.volStatus = 0,
   });
 
   factory Collection.fromJson(Map<String, dynamic> j) => Collection(
-        subject: Subject.fromJson(
-            (j['subject'] as Map?)?.cast<String, dynamic>() ?? const {}),
-        type: (j['type'] as num?)?.toInt() ?? 0,
-        rate: (j['rate'] as num?)?.toInt() ?? 0,
-        comment: j['comment']?.toString() ?? '',
-        updatedAt: j['updated_at']?.toString() ?? '',
-        isPrivate: j['private'] as bool? ?? false,
-      );
+    subject: Subject.fromJson(
+      (j['subject'] as Map?)?.cast<String, dynamic>() ?? const {},
+    ),
+    type: _intValue(j['type']),
+    rate: _intValue(j['rate']),
+    comment: j['comment']?.toString() ?? '',
+    updatedAt: j['updated_at']?.toString() ?? '',
+    isPrivate: j['private'] as bool? ?? false,
+    epStatus: _intValue(j['ep_status']),
+    volStatus: _intValue(j['vol_status']),
+  );
 
-  String get typeLabel => collectionTypeLabel(type);
+  String get typeLabel => collectionTypeLabel(type, subjectType: subject.type);
 }
 
 String careerLabel(String c) {
@@ -353,9 +378,11 @@ class Character {
       nameCn: j['name_cn']?.toString() ?? '',
       relation: j['relation']?.toString() ?? '',
       imagesLarge: _https(
-          images['large']?.toString() ?? images['grid']?.toString() ?? ''),
+        images['large']?.toString() ?? images['grid']?.toString() ?? '',
+      ),
       summary: j['summary']?.toString() ?? '',
-      infobox: (j['infobox'] as List?)
+      infobox:
+          (j['infobox'] as List?)
               ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -364,7 +391,8 @@ class Character {
       gender: j['gender']?.toString() ?? '',
       birthYear: _numStr(j['birth_year']),
       bloodType: j['blood_type']?.toString() ?? '',
-      actors: (j['actors'] as List?)
+      actors:
+          (j['actors'] as List?)
               ?.map((e) => PersonLite.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -389,7 +417,8 @@ class PersonLite {
       id: (j['id'] as num?)?.toInt() ?? 0,
       name: j['name']?.toString() ?? '',
       imagesLarge: _https(
-          images['large']?.toString() ?? images['grid']?.toString() ?? ''),
+        images['large']?.toString() ?? images['grid']?.toString() ?? '',
+      ),
     );
   }
 }
@@ -426,14 +455,14 @@ class Person {
     return Person(
       id: (j['id'] as num?)?.toInt() ?? 0,
       name: j['name']?.toString() ?? '',
-      career: (j['career'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      career:
+          (j['career'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       imagesLarge: _https(
-          images['large']?.toString() ?? images['grid']?.toString() ?? ''),
+        images['large']?.toString() ?? images['grid']?.toString() ?? '',
+      ),
       summary: j['summary']?.toString() ?? '',
-      infobox: (j['infobox'] as List?)
+      infobox:
+          (j['infobox'] as List?)
               ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -467,13 +496,13 @@ class WorkRef {
   });
 
   factory WorkRef.fromJson(Map<String, dynamic> j) => WorkRef(
-        subjectId: (j['id'] as num?)?.toInt() ?? 0,
-        staff: j['staff']?.toString() ?? '',
-        name: j['name']?.toString() ?? '',
-        nameCn: j['name_cn']?.toString() ?? '',
-        image: _https(j['image']?.toString() ?? ''),
-        type: (j['type'] as num?)?.toInt() ?? 0,
-      );
+    subjectId: (j['id'] as num?)?.toInt() ?? 0,
+    staff: j['staff']?.toString() ?? '',
+    name: j['name']?.toString() ?? '',
+    nameCn: j['name_cn']?.toString() ?? '',
+    image: _https(j['image']?.toString() ?? ''),
+    type: (j['type'] as num?)?.toInt() ?? 0,
+  );
 
   String get title => nameCn.isNotEmpty ? nameCn : name;
 }
@@ -504,7 +533,8 @@ class CastRef {
       id: (j['id'] as num?)?.toInt() ?? 0,
       name: j['name']?.toString() ?? '',
       imagesLarge: _https(
-          images['large']?.toString() ?? images['grid']?.toString() ?? ''),
+        images['large']?.toString() ?? images['grid']?.toString() ?? '',
+      ),
       subjectName: j['subject_name']?.toString() ?? '',
       subjectNameCn: j['subject_name_cn']?.toString() ?? '',
       subjectId: (j['subject_id'] as num?)?.toInt() ?? 0,
