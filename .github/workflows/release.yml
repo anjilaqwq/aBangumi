@@ -15,11 +15,6 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v5
 
-      - name: 安装 Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: 安装 Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -30,9 +25,6 @@ jobs:
       - name: 获取依赖
         run: flutter pub get
 
-      - name: 测试 BFF
-        run: npm test --prefix server
-
       - name: 静态分析
         run: flutter analyze
 
@@ -40,7 +32,7 @@ jobs:
         run: flutter test
 
       # URL 与 Client ID 均为公开配置。仓库变量可覆盖默认生产值；
-      # BANGUMI_CLIENT_SECRET 只存在于 OA/BFF 服务器，绝不进入 Actions。
+      # BANGUMI_CLIENT_SECRET 只存在于私有 OA 服务，绝不进入 Actions。
       - name: 构建 release APK
         env:
           ABANGUMI_AUTH_BASE_URL: ${{ vars.ABANGUMI_AUTH_BASE_URL || 'https://api.anjila.icu' }}

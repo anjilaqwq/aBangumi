@@ -20,23 +20,26 @@ class BangumiApi {
   static const String _ua =
       'aBangumi/1.1.1 (https://github.com/anjilaqwq/aBangumi)';
 
-  static Map<String, String> _headers({String? token}) => {
-    'User-Agent': _ua,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-  };
-
-  /// Where an authenticated request goes: manual tokens hit api.bgm.tv directly;
-  /// opaque BFF sessions go through `${ABANGUMI_AUTH_BASE_URL}/api/bangumi`.
-  static _AuthTarget _authTarget(String token) {
+  /// OA is also the network path for public reads. This keeps browsing usable
+  /// when a device cannot resolve or reach Bangumi directly. Raw manual tokens
+  /// remain direct and are never disclosed to the OA server.
+  static _AuthTarget _requestTarget(String? token) {
     if (OAuthConfig.isSessionToken(token)) {
       return _AuthTarget(
         '${OAuthConfig.requireAuthBaseUrl()}${OAuthConfig.proxyPrefix}',
-        OAuthConfig.sessionTokenOf(token),
+        OAuthConfig.sessionTokenOf(token!),
       );
     }
-    return _AuthTarget(baseUrl, token);
+    if (token != null && token.isNotEmpty) {
+      return _AuthTarget(baseUrl, token);
+    }
+    if (OAuthConfig.isConfigured) {
+      return _AuthTarget(
+        '${OAuthConfig.requireAuthBaseUrl()}${OAuthConfig.proxyPrefix}',
+        '',
+      );
+    }
+    return const _AuthTarget(baseUrl, '');
   }
 
   static Map<String, String> _authHeaders(_AuthTarget t) => {
@@ -53,16 +56,16 @@ class BangumiApi {
     bool forceRefresh = false,
   }) async {
     final authenticated = token != null && token.isNotEmpty;
-    final target = authenticated ? _authTarget(token) : null;
-    final requestUri = target == null
-        ? uri
-        : Uri.parse('${target.baseUrl}${uri.path}').replace(query: uri.query);
+    final target = _requestTarget(token);
+    final requestUri = Uri.parse(
+      '${target.baseUrl}${uri.path}',
+    ).replace(query: uri.query);
 
     Future<dynamic> request() async {
       final resp = await http
           .get(
             requestUri,
-            headers: target == null ? _headers() : _authHeaders(target),
+            headers: _authHeaders(target),
           )
           .timeout(const Duration(seconds: 20));
       if (resp.statusCode != 200) throw ApiException(resp.statusCode);
@@ -166,15 +169,14 @@ class BangumiApi {
     required int limit,
     required int offset,
   }) async {
-    final authenticated = token != null && token.isNotEmpty;
-    final target = authenticated ? _authTarget(token) : null;
+    final target = _requestTarget(token);
     final uri = Uri.parse(
-      '${target?.baseUrl ?? baseUrl}$path',
+      '${target.baseUrl}$path',
     ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
     final resp = await http
         .post(
           uri,
-          headers: target == null ? _headers() : _authHeaders(target),
+          headers: _authHeaders(target),
           body: jsonEncode({
             'keyword': keyword,
             if (filter.isNotEmpty) 'filter': filter,
@@ -349,7 +351,7 @@ class BangumiApi {
 
   /// 当前用户信息（校验令牌）
   static Future<User> me(String token) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final resp = await http
         .get(Uri.parse('${t.baseUrl}/v0/me'), headers: _authHeaders(t))
         .timeout(const Duration(seconds: 20));
@@ -370,7 +372,7 @@ class BangumiApi {
     int limit = 50,
     int offset = 0,
   }) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final uri = Uri.parse('${t.baseUrl}/v0/users/$username/collections')
         .replace(
           queryParameters: {
@@ -402,7 +404,7 @@ class BangumiApi {
     String username,
     int subjectId,
   ) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final resp = await http
         .get(
           Uri.parse('${t.baseUrl}/v0/users/$username/collections/$subjectId'),
@@ -421,7 +423,7 @@ class BangumiApi {
     String token,
     int subjectId,
   ) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final uri = Uri.parse(
       '${t.baseUrl}/v0/users/-/collections/$subjectId/episodes',
     ).replace(queryParameters: {'limit': '200'});
@@ -449,7 +451,7 @@ class BangumiApi {
     int episodeId,
     int type,
   ) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final resp = await http
         .put(
           Uri.parse(
@@ -473,7 +475,7 @@ class BangumiApi {
     int? rate,
     String? comment,
   }) async {
-    final t = _authTarget(token);
+    final t = _requestTarget(token);
     final resp = await http
         .post(
           Uri.parse('${t.baseUrl}/v0/users/-/collections/$subjectId'),

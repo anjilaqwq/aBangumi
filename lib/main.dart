@@ -39,7 +39,9 @@ class _ProxyHttpOverrides extends HttpOverrides {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   PaintingBinding.instance.imageCache
-    ..maximumSize = 90
+    // Keep more small decoded thumbnails available between scroll passes. The
+    // byte cap remains the hard memory guard for large covers/resources.
+    ..maximumSize = 180
     ..maximumSizeBytes = 48 << 20;
   await ProxyStore.instance.init();
   HttpOverrides.global = _ProxyHttpOverrides();

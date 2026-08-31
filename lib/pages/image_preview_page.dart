@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../network/bangumi_resource.dart';
+
 class ImagePreviewPage extends StatelessWidget {
   final String imageUrl;
   final String title;
@@ -17,7 +19,7 @@ class ImagePreviewPage extends StatelessWidget {
     final media = MediaQuery.of(context);
     final pixelRatio = media.devicePixelRatio.clamp(1.0, 2.0);
     final provider = ResizeImage(
-      NetworkImage(imageUrl),
+      bangumiNetworkImage(imageUrl),
       width: (media.size.width * pixelRatio).round().clamp(1, 1600),
       height: (media.size.height * pixelRatio).round().clamp(1, 2400),
       policy: ResizeImagePolicy.fit,

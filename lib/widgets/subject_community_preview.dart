@@ -1,60 +1,28 @@
 import 'package:flutter/material.dart';
 
-import '../api/bangumi_private_api.dart';
 import '../models/models.dart';
 import '../models/private_api_models.dart';
 import '../navigation/routes.dart';
-import '../store/auth_store.dart';
 import 'common/common.dart';
 
-class SubjectCommunityPreview extends StatefulWidget {
+class SubjectCommunityPreview extends StatelessWidget {
   final int subjectId;
   final int subjectType;
+  final Future<P1SubjectCommunity> future;
+  final VoidCallback onReload;
 
   const SubjectCommunityPreview({
     super.key,
     required this.subjectId,
     required this.subjectType,
+    required this.future,
+    required this.onReload,
   });
-
-  @override
-  State<SubjectCommunityPreview> createState() =>
-      _SubjectCommunityPreviewState();
-}
-
-class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
-  late Future<P1SubjectCommunity> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-    AuthStore.instance.token.addListener(_authChanged);
-  }
-
-  Future<P1SubjectCommunity> _load() => BangumiPrivateApi.subjectCommunity(
-    widget.subjectId,
-    token: AuthStore.instance.token.value,
-  );
-
-  void _authChanged() => _reload();
-
-  void _reload() {
-    setState(() {
-      _future = _load();
-    });
-  }
-
-  @override
-  void dispose() {
-    AuthStore.instance.token.removeListener(_authChanged);
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<P1SubjectCommunity>(
-      future: _future,
+      future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
@@ -68,7 +36,7 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: _reload,
+                onPressed: onReload,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('社区内容暂时不可用'),
               ),
@@ -91,7 +59,7 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
                 icon: Icons.forum_outlined,
                 title: '讨论',
                 total: data.topics.total,
-                onMore: () => _openCommunity(0),
+                onMore: () => _openCommunity(context, 0),
                 children: [
                   for (final topic in data.topics.items) _topic(context, topic),
                 ],
@@ -101,7 +69,7 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
                 icon: Icons.article_outlined,
                 title: '长评',
                 total: data.reviews.total,
-                onMore: () => _openCommunity(1),
+                onMore: () => _openCommunity(context, 1),
                 children: [
                   for (final review in data.reviews.items)
                     _review(context, review),
@@ -112,7 +80,7 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
                 icon: Icons.chat_bubble_outline,
                 title: '吐槽',
                 total: data.comments.total,
-                onMore: () => _openCommunity(2),
+                onMore: () => _openCommunity(context, 2),
                 children: [
                   for (final comment in data.comments.items)
                     _comment(context, comment),
@@ -125,11 +93,11 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
     );
   }
 
-  void _openCommunity(int tab) {
+  void _openCommunity(BuildContext context, int tab) {
     AppRoutes.pushSubjectCommunity(
       context,
-      subjectId: widget.subjectId,
-      subjectType: widget.subjectType,
+      subjectId: subjectId,
+      subjectType: subjectType,
       initialTab: tab,
     );
   }
@@ -164,7 +132,7 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
   Widget _comment(BuildContext context, P1SubjectComment comment) {
     final label = collectionTypeLabel(
       comment.collectionType,
-      subjectType: widget.subjectType,
+      subjectType: subjectType,
     );
     return _CommunityTile(
       title: comment.user.displayName,

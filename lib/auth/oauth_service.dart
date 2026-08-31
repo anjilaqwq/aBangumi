@@ -18,7 +18,7 @@ class OAuthCallback {
   const OAuthCallback({required this.ticket, required this.state});
 }
 
-/// Credentials returned after claiming the one-time ticket from the BFF.
+/// Credentials returned after claiming the one-time ticket from the OA service.
 class OAuthSession {
   final String sessionToken;
   final DateTime expiresAt;
@@ -51,7 +51,7 @@ class OAuthBrowserLaunchException implements Exception {
 }
 
 /// Drives the secure Bangumi OAuth flow: start in the system browser, parse the
-/// `abangumi://oauth/callback` deep link, verify `state`, and claim the ticket.
+/// OAuth deep link, verify `state`, and claim the ticket.
 ///
 /// **Ticket-theft defense (PKCE-style claim verifier):**
 /// before `/start` the app generates a ≥256-bit random `verifier` and sends the
@@ -65,7 +65,7 @@ class OAuthBrowserLaunchException implements Exception {
 /// survives app process death during the browser round-trip, and are cleared on
 /// success, definitive failure, timeout, or a new start.
 ///
-/// Contains no client secret — the BFF (`server/`) owns all secrets and tokens.
+/// Contains no client secret — the private OA service owns all secrets and tokens.
 class OAuthService {
   OAuthService._();
 

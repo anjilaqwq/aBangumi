@@ -1,7 +1,34 @@
 import 'package:flutter/material.dart';
 
+import '../../network/bangumi_resource.dart';
+
 import '../../theme/app_colors.dart';
 import 'page_header.dart';
+
+/// Keeps one coarse list section mounted while it is outside the viewport.
+///
+/// This is intended for a small number of page-level sections that own
+/// request Futures or form state. It should not wrap every row in a long list.
+class KeepAliveSection extends StatefulWidget {
+  final Widget child;
+
+  const KeepAliveSection({super.key, required this.child});
+
+  @override
+  State<KeepAliveSection> createState() => _KeepAliveSectionState();
+}
+
+class _KeepAliveSectionState extends State<KeepAliveSection>
+    with AutomaticKeepAliveClientMixin<KeepAliveSection> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
 
 /// 在平板/桌面宽屏上限制阅读区域，手机端保持占满。
 class AdaptiveContentWidth extends StatelessWidget {
@@ -65,6 +92,7 @@ class CoverImage extends StatefulWidget {
   final AlignmentGeometry alignment;
   final double borderRadius;
   final Widget? placeholder;
+  final FilterQuality filterQuality;
 
   const CoverImage({
     super.key,
@@ -75,6 +103,7 @@ class CoverImage extends StatefulWidget {
     this.alignment = Alignment.center,
     this.borderRadius = 4,
     this.placeholder,
+    this.filterQuality = FilterQuality.low,
   });
 
   @override
@@ -123,7 +152,7 @@ class _CoverImageState extends State<CoverImage> {
     final decodeHeight = widget.height == null
         ? null
         : (widget.height! * pixelRatio).round().clamp(1, 2000);
-    final networkImage = NetworkImage(widget.imageUrl);
+    final networkImage = bangumiNetworkImage(widget.imageUrl);
     final ImageProvider<Object> provider =
         decodeWidth == null && decodeHeight == null
         ? networkImage
@@ -201,7 +230,7 @@ class _CoverImageState extends State<CoverImage> {
               fit: fit,
               alignment: widget.alignment,
               gaplessPlayback: true,
-              filterQuality: FilterQuality.medium,
+              filterQuality: widget.filterQuality,
               errorBuilder: (_, __, ___) => fallback,
             ),
     );
@@ -459,6 +488,7 @@ class _DetailCover extends StatelessWidget {
       height: height,
       alignment: alignment,
       borderRadius: 12,
+      filterQuality: FilterQuality.medium,
     );
     if (heroTag != null) {
       image = Hero(tag: heroTag!, child: image);

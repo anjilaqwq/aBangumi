@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../network/bangumi_resource.dart';
 import 'common/common.dart';
 
 /// 出演作品行（用于角色页/人物页的作品列表）
@@ -68,7 +69,8 @@ class CastTile extends StatelessWidget {
           height: 40,
           child: cast.imagesLarge.isNotEmpty
               ? Image.network(
-                  cast.imagesLarge,
+                  resolveBangumiResourceUrl(cast.imagesLarge),
+                  headers: bangumiResourceHeaders,
                   cacheWidth: 120,
                   cacheHeight: 120,
                   fit: BoxFit.cover,

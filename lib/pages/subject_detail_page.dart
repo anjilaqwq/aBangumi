@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
+import '../api/bangumi_private_api.dart';
 import '../models/models.dart';
+import '../models/private_api_models.dart';
 import '../navigation/routes.dart';
 import '../store/auth_store.dart';
 import '../theme/app_colors.dart';
@@ -21,6 +23,8 @@ class SubjectDetailPage extends StatefulWidget {
 class _SubjectDetailPageState extends State<SubjectDetailPage> {
   late Future<Subject> _subjectFuture;
   late Future<List<Character>> _charactersFuture;
+  late Future<List<Subject>> _relatedFuture;
+  late Future<P1SubjectCommunity> _communityFuture;
   late _EpisodeTracker _tracker;
   String? _authToken;
 
@@ -30,6 +34,14 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
     _authToken = AuthStore.instance.token.value;
     _subjectFuture = BangumiApi.subject(widget.subjectId, token: _authToken);
     _charactersFuture = BangumiApi.characters(
+      widget.subjectId,
+      token: _authToken,
+    );
+    _relatedFuture = BangumiApi.relatedSubjects(
+      widget.subjectId,
+      token: _authToken,
+    );
+    _communityFuture = BangumiPrivateApi.subjectCommunity(
       widget.subjectId,
       token: _authToken,
     );
@@ -48,6 +60,23 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
     setState(() {
       _subjectFuture = BangumiApi.subject(widget.subjectId, token: token);
       _charactersFuture = BangumiApi.characters(widget.subjectId, token: token);
+      _relatedFuture = BangumiApi.relatedSubjects(
+        widget.subjectId,
+        token: token,
+      );
+      _communityFuture = BangumiPrivateApi.subjectCommunity(
+        widget.subjectId,
+        token: token,
+      );
+    });
+  }
+
+  void _reloadCommunity() {
+    setState(() {
+      _communityFuture = BangumiPrivateApi.subjectCommunity(
+        widget.subjectId,
+        token: _authToken,
+      );
     });
   }
 
@@ -83,6 +112,8 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
           final coverHeroTag = 'subject-cover-${s.id}';
           return AdaptiveContentWidth(
             child: ListView(
+              key: PageStorageKey('subject-detail-${s.id}'),
+              cacheExtent: 720,
               children: [
                 DetailHero(
                   coverUrl: s.cover,
@@ -112,10 +143,18 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
                     if (s.rank > 0) TagChip(label: 'Rank #${s.rank}'),
                   ],
                 ),
-                _content(s),
-                _RelatedSection(subjectId: s.id, token: _authToken),
+                KeepAliveSection(
+                  key: const ValueKey('subject-detail-content'),
+                  child: _content(s),
+                ),
+                _RelatedSection(future: _relatedFuture),
                 _charactersSection(_charactersFuture),
-                SubjectCommunityPreview(subjectId: s.id, subjectType: s.type),
+                SubjectCommunityPreview(
+                  subjectId: s.id,
+                  subjectType: s.type,
+                  future: _communityFuture,
+                  onReload: _reloadCommunity,
+                ),
                 _EpisodesSection(tracker: _tracker),
               ],
             ),
@@ -661,38 +700,20 @@ class _CollectionEditorSheetState extends State<_CollectionEditorSheet> {
 // ---------------- 相关条目（可展开，细化卡片） ----------------
 
 class _RelatedSection extends StatefulWidget {
-  final int subjectId;
-  final String? token;
-  const _RelatedSection({required this.subjectId, this.token});
+  final Future<List<Subject>> future;
+  const _RelatedSection({required this.future});
 
   @override
   State<_RelatedSection> createState() => _RelatedSectionState();
 }
 
 class _RelatedSectionState extends State<_RelatedSection> {
-  late Future<List<Subject>> _future;
   bool _expanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = BangumiApi.relatedSubjects(widget.subjectId, token: widget.token);
-  }
-
-  @override
-  void didUpdateWidget(covariant _RelatedSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.subjectId == widget.subjectId &&
-        oldWidget.token == widget.token) {
-      return;
-    }
-    _future = BangumiApi.relatedSubjects(widget.subjectId, token: widget.token);
-  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Subject>>(
-      future: _future,
+      future: widget.future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const SizedBox.shrink();

@@ -21,35 +21,19 @@
 
 ## 架构
 
-```text
-Flutter 客户端（aBangumi）
-  │ ① POST /auth/bangumi/start  →  authorization_url + state
-  │ ② 系统浏览器打开授权页，用户授权
-  │ ③ Bangumi 302 → https://<BFF>/auth/bangumi/callback（HTTPS 回调）
-  │ ④ BFF 服务端用 code 换 access/refresh token，生成一次性 ticket，
-  │    302 → abangumi://oauth/callback?ticket=…&state=…
-  │ ⑤ App 校验 state，POST /auth/bangumi/claim → 不透明 session_token
-  │ ⑥ 官方 API 请求走 /api/bangumi/*，p1 社区请求走
-  │    /api/bangumi-p1/*，均由 BFF 代理并自动刷新令牌
-  ▼
-Bangumi API（api.bgm.tv / next.bgm.tv/p1）
-```
-
-**OAuth 边界**：Bangumi OAuth 无 PKCE、必须使用 `client_secret`，因此 `client_secret`
-与 access/refresh token **只存在于 BFF 服务端**；Flutter 客户端只持有不透明会话令牌
-（`session_token`），服务端负责代理与刷新。
+aBangumi 是 Flutter 客户端。项目维护者提供的 OA 服务负责 OAuth 登录、令牌保护以及
+Bangumi API 访问；客户端不会包含 `client_secret`、access token 或 refresh token，
+只保存不透明会话凭据。
 
 > ⚠️ **App Secret 绝不属于 Flutter 端**：`client_secret` 永远不要写进客户端代码、
-> `--dart-define`、Git 仓库或 GitHub Actions。它是 BFF 专属的服务器环境变量。
+> `--dart-define`、Git 仓库或 GitHub Actions。它只属于 OA 服务的私有部署环境。
 
 ## 登录（OAuth，推荐）
 
 OAuth 登录服务由项目维护者提供，官方 Release 已完成配置。普通用户安装 APK 后可直接在
 “我的”页面选择「使用 Bangumi 账号登录」，无需自行部署服务器或填写 OAuth 参数。
 
-服务端源码仍保留在 [`server/`](server/) 供开发、审计和自建使用；自建版本的环境变量与
-部署方式请参阅 [`server/README.md`](server/README.md)。官方服务不可用时仍可使用下方
-「手动令牌」方式登录。
+OA 服务不可用时仍可使用下方「手动令牌」方式登录。
 
 ## 登录（手动令牌，回退）
 
@@ -74,23 +58,15 @@ flutter build apk --release
 
 产物：`build/app/outputs/flutter-apk/app-release.apk`
 
-BFF（需 Node.js 20+）：
-
-```bash
-cd server
-npm test        # node --test，无网络依赖
-npm start       # 需先配置环境变量，见 server/README.md
-```
-
 ## 说明
 
 - 数据与版权归 [Bangumi (bgm.tv)](https://bgm.tv) 所有，本项目仅调用其公开 API。
 - release APK 使用 Flutter 模板默认的 debug 签名，仅供个人安装测试。
-- GitHub Release 默认注入项目 OA/BFF 地址和公开 Client ID；可使用仓库变量
+- GitHub Release 默认注入项目 OA 地址和公开 Client ID；可使用仓库变量
   `ABANGUMI_AUTH_BASE_URL`、`ABANGUMI_CLIENT_ID` 覆盖（见
   [.github/workflows/release.yml](.github/workflows/release.yml)）。`BANGUMI_CLIENT_SECRET`
   永远只属于服务器部署环境。
 
 ## 技术栈
 
-Flutter 3.35 · Material 3 · http · shared_preferences · flutter_secure_storage · app_links · url_launcher · Node.js 20 BFF（无第三方依赖）
+Flutter 3.35 · Material 3 · http · shared_preferences · flutter_secure_storage · app_links · url_launcher

@@ -32,8 +32,9 @@ abstract final class BangumiPrivateApi {
   }) async {
     final authenticated = token != null && token.isNotEmpty;
     final isSession = OAuthConfig.isSessionToken(token);
+    final useProxy = isSession || (!authenticated && OAuthConfig.isConfigured);
     final uri = Uri.parse(
-      isSession
+      useProxy
           ? '${OAuthConfig.requireAuthBaseUrl()}${OAuthConfig.privateProxyPrefix}$path'
           : '$baseUrl$path',
     ).replace(queryParameters: query);

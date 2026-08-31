@@ -2,7 +2,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
-/// Missing or unsafe public BFF base URL; contains no environment value.
+/// Missing or unsafe public OA base URL; contains no environment value.
 class OAuthConfigurationException implements Exception {
   const OAuthConfigurationException();
 
@@ -13,7 +13,7 @@ class OAuthConfigurationException implements Exception {
 /// Bangumi OAuth configuration.
 ///
 /// These values are public and safe to ship in the app. The **client secret**
-/// lives only on the BFF (see `server/`) and is never present here.
+/// lives only on the private OA service and is never present here.
 class OAuthConfig {
   OAuthConfig._();
 
@@ -26,7 +26,7 @@ class OAuthConfig {
     defaultValue: 'bgm69386a8765324f840',
   );
 
-  /// Base URL of the auth BFF, e.g. `https://auth.example.com`.
+  /// Base URL of the OA service, e.g. `https://auth.example.com`.
   ///
   /// Required for the OAuth flow. Overridable at build time with:
   /// `--dart-define=ABANGUMI_AUTH_BASE_URL=https://auth.example.com`
@@ -34,13 +34,13 @@ class OAuthConfig {
     'ABANGUMI_AUTH_BASE_URL',
   );
 
-  /// Custom scheme deep link the BFF redirects back to after authorization.
+  /// Custom scheme deep link the OA service redirects to after authorization.
   static const String callbackScheme = 'abangumi';
   static const String callbackHost = 'oauth';
   static const String callbackPath = '/callback';
   static const String callbackUri = 'abangumi://oauth/callback';
 
-  /// Validated BFF origin. Production requires HTTPS; debug builds may use an
+  /// Validated OA origin. Production requires HTTPS; debug builds may use an
   /// explicit emulator/loopback host over HTTP for local development only.
   static String requireAuthBaseUrl() {
     final base = authBaseUrl.trim();
@@ -63,7 +63,7 @@ class OAuthConfig {
     return base.replaceAll(RegExp(r'/+$'), '');
   }
 
-  /// Whether the OAuth flow has a valid public BFF base URL.
+  /// Whether the OAuth flow has a valid public OA base URL.
   static bool get isConfigured {
     try {
       requireAuthBaseUrl();
@@ -73,11 +73,11 @@ class OAuthConfig {
     }
   }
 
-  /// Prefix used to mark an opaque BFF session token, so [BangumiApi] can
+  /// Prefix used to mark an opaque OA session token, so [BangumiApi] can
   /// distinguish it from a raw (manual) Bangumi access token.
   static const String sessionTokenPrefix = 'oauth:';
 
-  /// True if [token] is an opaque BFF session token (OAuth mode).
+  /// True if [token] is an opaque OA session token (OAuth mode).
   static bool isSessionToken(String? token) =>
       token != null && token.startsWith(sessionTokenPrefix);
 
@@ -87,10 +87,11 @@ class OAuthConfig {
       ? token.substring(sessionTokenPrefix.length)
       : token;
 
-  /// BFF endpoint paths.
+  /// OA endpoint paths.
   static const String startPath = '/auth/bangumi/start';
   static const String claimPath = '/auth/bangumi/claim';
   static const String logoutPath = '/auth/logout';
   static const String proxyPrefix = '/api/bangumi';
   static const String privateProxyPrefix = '/api/bangumi-p1';
+  static const String resourceProxyPath = '/api/bangumi-resource';
 }
