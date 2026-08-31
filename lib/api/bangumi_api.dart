@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../auth/oauth_config.dart';
+import '../auth/oauth_session_events.dart';
 import '../models/models.dart';
 import '../store/dynamic_cache_store.dart';
 
@@ -54,20 +55,28 @@ class BangumiApi {
     String? token,
     Duration cacheDuration = const Duration(minutes: 12),
     bool forceRefresh = false,
+    bool allowAnonymousFallback = false,
   }) async {
     final authenticated = token != null && token.isNotEmpty;
     final target = _requestTarget(token);
-    final requestUri = Uri.parse(
-      '${target.baseUrl}${uri.path}',
-    ).replace(query: uri.query);
 
     Future<dynamic> request() async {
-      final resp = await http
+      Future<http.Response> send(_AuthTarget requestTarget) => http
           .get(
-            requestUri,
-            headers: _authHeaders(target),
+            Uri.parse(
+              '${requestTarget.baseUrl}${uri.path}',
+            ).replace(query: uri.query),
+            headers: _authHeaders(requestTarget),
           )
           .timeout(const Duration(seconds: 20));
+
+      var resp = await send(target);
+      if (_isRejectedOAuthSession(token, resp.statusCode)) {
+        await OAuthSessionEvents.notifyInvalidated();
+        if (allowAnonymousFallback) {
+          resp = await send(_requestTarget(null));
+        }
+      }
       if (resp.statusCode != 200) throw ApiException(resp.statusCode);
       return jsonDecode(utf8.decode(resp.bodyBytes));
     }
@@ -169,13 +178,11 @@ class BangumiApi {
     required int limit,
     required int offset,
   }) async {
-    final target = _requestTarget(token);
-    final uri = Uri.parse(
-      '${target.baseUrl}$path',
-    ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
-    final resp = await http
+    Future<http.Response> send(_AuthTarget target) => http
         .post(
-          uri,
+          Uri.parse('${target.baseUrl}$path').replace(
+            queryParameters: {'limit': '$limit', 'offset': '$offset'},
+          ),
           headers: _authHeaders(target),
           body: jsonEncode({
             'keyword': keyword,
@@ -183,6 +190,11 @@ class BangumiApi {
           }),
         )
         .timeout(const Duration(seconds: 20));
+    var resp = await send(_requestTarget(token));
+    if (_isRejectedOAuthSession(token, resp.statusCode)) {
+      await OAuthSessionEvents.notifyInvalidated();
+      resp = await send(_requestTarget(null));
+    }
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
     return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
   }
@@ -236,7 +248,11 @@ class BangumiApi {
   static Future<Subject> subject(int id, {String? token}) async {
     debugPrint('[bgm] subject($id)');
     final map =
-        await _getJson(Uri.parse('$baseUrl/v0/subjects/$id'), token: token)
+        await _getJson(
+              Uri.parse('$baseUrl/v0/subjects/$id'),
+              token: token,
+              allowAnonymousFallback: true,
+            )
             as Map<String, dynamic>;
     return Subject.fromJson(map);
   }
@@ -251,7 +267,11 @@ class BangumiApi {
         'offset': '0',
       },
     );
-    final map = await _getJson(uri, token: token) as Map<String, dynamic>;
+    final map = await _getJson(
+      uri,
+      token: token,
+      allowAnonymousFallback: true,
+    ) as Map<String, dynamic>;
     final data = (map['data'] as List?) ?? const [];
     return data
         .map((e) => Episode.fromJson(e as Map<String, dynamic>))
@@ -266,7 +286,11 @@ class BangumiApi {
     final uri = Uri.parse(
       '$baseUrl/v0/subjects/$subjectId/subjects',
     ).replace(queryParameters: {'limit': '50'});
-    final list = await _getJson(uri, token: token) as List;
+    final list = await _getJson(
+      uri,
+      token: token,
+      allowAnonymousFallback: true,
+    ) as List;
     return list
         .map((e) => Subject.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -280,7 +304,11 @@ class BangumiApi {
     final uri = Uri.parse(
       '$baseUrl/v0/subjects/$subjectId/characters',
     ).replace(queryParameters: {'limit': '50'});
-    final list = await _getJson(uri, token: token) as List;
+    final list = await _getJson(
+      uri,
+      token: token,
+      allowAnonymousFallback: true,
+    ) as List;
     return list
         .map((e) => Character.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -355,6 +383,7 @@ class BangumiApi {
     final resp = await http
         .get(Uri.parse('${t.baseUrl}/v0/me'), headers: _authHeaders(t))
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
     final u = User.fromJson(
       jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>,
@@ -385,6 +414,7 @@ class BangumiApi {
     final resp = await http
         .get(uri, headers: _authHeaders(t))
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
     final map = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     final data = (map['data'] as List?) ?? const [];
@@ -411,6 +441,7 @@ class BangumiApi {
           headers: _authHeaders(t),
         )
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode == 404) return null;
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
     return Collection.fromJson(
@@ -430,6 +461,7 @@ class BangumiApi {
     final resp = await http
         .get(uri, headers: _authHeaders(t))
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
     final map = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     final data = (map['data'] as List?) ?? const [];
@@ -461,6 +493,7 @@ class BangumiApi {
           body: jsonEncode({'type': type}),
         )
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw ApiException(resp.statusCode);
     }
@@ -487,12 +520,26 @@ class BangumiApi {
           }),
         )
         .timeout(const Duration(seconds: 20));
+    await _notifyIfRejectedOAuthSession(token, resp.statusCode);
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw ApiException(resp.statusCode);
     }
     debugPrint(
       '[bgm] updateCollection(subject=$subjectId, type=$type, rate=$rate) ok',
     );
+  }
+
+  static bool _isRejectedOAuthSession(String? token, int statusCode) =>
+      OAuthConfig.isSessionToken(token) &&
+      (statusCode == 401 || statusCode == 403);
+
+  static Future<void> _notifyIfRejectedOAuthSession(
+    String? token,
+    int statusCode,
+  ) async {
+    if (_isRejectedOAuthSession(token, statusCode)) {
+      await OAuthSessionEvents.notifyInvalidated();
+    }
   }
 }
 

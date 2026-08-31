@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bgm_app/auth/oauth_config.dart';
+import 'package:bgm_app/auth/oauth_session_events.dart';
 import 'package:bgm_app/auth/oauth_service.dart';
 import 'package:bgm_app/store/auth_store.dart';
 
@@ -65,6 +66,18 @@ void main() {
   });
 
   group('AuthStore observable OAuth state', () {
+    test('rejected OA session clears stale local auth state', () async {
+      final store = AuthStore.forTesting();
+      store.token.value = 'oauth:stale-session-for-test';
+
+      await OAuthSessionEvents.notifyInvalidated();
+
+      expect(store.token.value, isNull);
+      expect(store.user.value, isNull);
+      expect(store.authMode.value, AuthMode.manual);
+      expect(store.error.value, contains('登录状态已失效'));
+    });
+
     test('initialization failure is observed and does not escape', () async {
       const fakeToken = 'fake-initialization-token-for-test-only';
       final store = AuthStore.forTesting(
@@ -131,28 +144,31 @@ void main() {
       },
     );
 
-    test('sequential duplicate callback is ignored after successful claim', () async {
-      var callbackCount = 0;
-      final store = AuthStore.forTesting(
-        callbackHandler: (_) async {
-          callbackCount += 1;
-          return OAuthSession(
-            sessionToken: 'fake-session-for-dedup-test',
-            expiresAt: DateTime.utc(2030),
-          );
-        },
-        sessionCompleter: (_) async {},
-      );
-      final uri = Uri.parse(
-        'abangumi://oauth/callback?ticket=fake&state=fake',
-      );
+    test(
+      'sequential duplicate callback is ignored after successful claim',
+      () async {
+        var callbackCount = 0;
+        final store = AuthStore.forTesting(
+          callbackHandler: (_) async {
+            callbackCount += 1;
+            return OAuthSession(
+              sessionToken: 'fake-session-for-dedup-test',
+              expiresAt: DateTime.utc(2030),
+            );
+          },
+          sessionCompleter: (_) async {},
+        );
+        final uri = Uri.parse(
+          'abangumi://oauth/callback?ticket=fake&state=fake',
+        );
 
-      await store.handleOAuthCallback(uri);
-      await store.handleOAuthCallback(uri);
+        await store.handleOAuthCallback(uri);
+        await store.handleOAuthCallback(uri);
 
-      expect(callbackCount, 1);
-      expect(store.error.value, isNull);
-    });
+        expect(callbackCount, 1);
+        expect(store.error.value, isNull);
+      },
+    );
 
     test(
       'claim completion failure is observed without exposing session',

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/bangumi_api.dart';
 import '../auth/oauth_config.dart';
 import '../auth/oauth_service.dart';
+import '../auth/oauth_session_events.dart';
 import '../models/models.dart';
 
 /// How the user is authenticated.
@@ -88,7 +89,9 @@ class AuthStore {
   }) : _initializationHandler = initializationHandler,
        _beginOAuthHandler = beginOAuthHandler,
        _callbackHandler = callbackHandler,
-       _sessionCompleter = sessionCompleter;
+       _sessionCompleter = sessionCompleter {
+    OAuthSessionEvents.onInvalidated = _invalidateOAuthSession;
+  }
 
   /// Test seam for deterministic OAuth state tests; no real credentials or
   /// platform plugins are needed when injected handlers fail before storage.
@@ -123,6 +126,7 @@ class AuthStore {
   final OAuthSessionCompleter? _sessionCompleter;
   int _busyDepth = 0;
   bool _callbackInFlight = false;
+  bool _sessionInvalidationInFlight = false;
   int? _completedCallbackFingerprint;
 
   /// Effective credential visible to pages: a raw access token (manual) or an
@@ -142,6 +146,23 @@ class AuthStore {
   bool get isLoggedIn => token.value != null && token.value!.isNotEmpty;
 
   void clearError() => error.value = null;
+
+  Future<void> _invalidateOAuthSession() async {
+    if (_sessionInvalidationInFlight ||
+        !OAuthConfig.isSessionToken(token.value)) {
+      return;
+    }
+    _sessionInvalidationInFlight = true;
+    try {
+      await _clearPersistedCredentialsBestEffort();
+    } finally {
+      authMode.value = AuthMode.manual;
+      token.value = null;
+      user.value = null;
+      error.value = '登录状态已失效，请重新登录；公开内容已继续加载。';
+      _sessionInvalidationInFlight = false;
+    }
+  }
 
   void _startWork() {
     _busyDepth += 1;

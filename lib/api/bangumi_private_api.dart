@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../auth/oauth_config.dart';
+import '../auth/oauth_session_events.dart';
 import '../models/models.dart';
 import '../models/private_api_models.dart';
 import '../store/dynamic_cache_store.dart';
@@ -33,18 +34,18 @@ abstract final class BangumiPrivateApi {
     final authenticated = token != null && token.isNotEmpty;
     final isSession = OAuthConfig.isSessionToken(token);
     final useProxy = isSession || (!authenticated && OAuthConfig.isConfigured);
-    final uri = Uri.parse(
-      useProxy
-          ? '${OAuthConfig.requireAuthBaseUrl()}${OAuthConfig.privateProxyPrefix}$path'
-          : '$baseUrl$path',
-    ).replace(queryParameters: query);
-
     Future<dynamic> request() async {
-      final response = await http
+      Future<http.Response> send({required bool anonymous}) => http
           .get(
-            uri,
+            Uri.parse(
+              useProxy || anonymous
+                  ? '${OAuthConfig.requireAuthBaseUrl()}${OAuthConfig.privateProxyPrefix}$path'
+                  : '$baseUrl$path',
+            ).replace(queryParameters: query),
             headers: _headers(
-              token: isSession
+              token: anonymous
+                  ? null
+                  : isSession
                   ? OAuthConfig.sessionTokenOf(token!)
                   : authenticated
                   ? token
@@ -52,6 +53,12 @@ abstract final class BangumiPrivateApi {
             ),
           )
           .timeout(const Duration(seconds: 20));
+      var response = await send(anonymous: false);
+      if (isSession &&
+          (response.statusCode == 401 || response.statusCode == 403)) {
+        await OAuthSessionEvents.notifyInvalidated();
+        response = await send(anonymous: true);
+      }
       if (response.statusCode != 200) throw ApiException(response.statusCode);
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
@@ -59,7 +66,7 @@ abstract final class BangumiPrivateApi {
     // Authenticated P1 responses can contain per-user and restricted data.
     if (authenticated) return request();
     return DynamicCacheStore.instance.loadJson(
-      key: uri.toString(),
+      key: '$baseUrl$path?${Uri(queryParameters: query).query}',
       maxAge: const Duration(minutes: 6),
       forceRefresh: forceRefresh,
       loader: request,
