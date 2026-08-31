@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../pages/character_page.dart';
+import '../pages/image_preview_page.dart';
 import '../pages/person_page.dart';
 import '../pages/proxy_settings_page.dart';
 import '../pages/subject_community_page.dart';
 import '../pages/subject_detail_page.dart';
 import '../pages/subject_topic_page.dart';
 import '../pages/tag_page.dart';
+import '../pages/user_profile_page.dart';
+import '../models/models.dart';
 
 /// 页面导航辅助：统一跳转入口，避免各处散落的 `MaterialPageRoute`。
 abstract final class AppRoutes {
@@ -39,6 +42,28 @@ abstract final class AppRoutes {
   static Future<T?> pushProxySettings<T>(BuildContext context) =>
       Navigator.of(context).push<T>(_route((_) => const ProxySettingsPage()));
 
+  static Future<T?> pushUserProfile<T>(
+    BuildContext context, {
+    required User user,
+    required int collectionTotal,
+  }) => Navigator.of(context).push<T>(
+    _route(
+      (_) => UserProfilePage(user: user, collectionTotal: collectionTotal),
+    ),
+  );
+
+  static Future<T?> pushImagePreview<T>(
+    BuildContext context, {
+    required String imageUrl,
+    required String title,
+    Object? heroTag,
+  }) => Navigator.of(context).push<T>(
+    _route(
+      (_) =>
+          ImagePreviewPage(imageUrl: imageUrl, title: title, heroTag: heroTag),
+    ),
+  );
+
   static Future<T?> pushSubjectTopic<T>(BuildContext context, int topicId) =>
       Navigator.of(
         context,
@@ -67,6 +92,16 @@ abstract final class AppRoutes {
 
   static Future<void> openBlog(BuildContext context, int blogId) =>
       _openExternal(context, Uri.parse('https://bgm.tv/blog/$blogId'));
+
+  static Future<void> openUserProfile(BuildContext context, User user) {
+    final provided = Uri.tryParse(user.url);
+    final uri = provided != null && provided.hasScheme
+        ? provided
+        : Uri.parse(
+            'https://bgm.tv/user/${Uri.encodeComponent(user.username)}',
+          );
+    return _openExternal(context, uri);
+  }
 
   static Future<void> _openExternal(BuildContext context, Uri uri) async {
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);

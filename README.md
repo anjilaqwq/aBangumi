@@ -4,10 +4,11 @@
 
 ## 功能
 
-- **日式极简 UI**：明朝体/宋体衬线、大量留白、黑白主色 + 少量朱红点缀的克制排版（Material 3 主题）。
-- **排行榜**：动画 / 书籍 / 游戏 / 音乐 / 三次元 类型切换。
-- **每日放送**：按星期浏览在播动画。
-- **搜索**：按条目类型过滤，支持搜索历史与结果分页。
+- **高辨识度响应式 UI**：手机使用可自动收起的底部导航，平板使用左侧控制栏；宽屏列表自动切换为高密度双列。
+- **排行榜**：动画 / 书籍 / 游戏 / 音乐 / 三次元类型切换、分页加载与下拉刷新，顶部信息随滚动收起。
+- **每日放送**：按星期浏览在播动画，平板双列展示。
+- **发现与社区**：热门条目、热门讨论、吐槽和长评；讨论支持分页加载、Markdown、Bangumi 表情与图片。
+- **搜索**：支持动画、书籍、游戏、音乐、三次元、角色与人物；登录后自动携带用户会话请求需要认证的条目。
 - **条目详情**：
   - 评分、收藏状态、信息盒、简介
   - 标签筛选与标签聚合页（分页加载）
@@ -16,6 +17,7 @@
   - 章节列表（本篇），显示每集讨论数
 - **收藏**：OAuth 登录（推荐）或手动 Access Token；个人资料、收藏列表（分页 + 类型/状态筛选）、详情页收藏编辑（类型 + 评分 + 评价）
 - **观看进度**：单集标记「看过」/ 取消，详情页顶部「已看 X/N」进度条，与章节列表实时联动
+- **性能与图片**：页面动态缓存、受控图片内存缓存；兼容长图、宽图与常规封面，详情封面可展开查看。
 
 ## 架构
 
@@ -27,9 +29,10 @@ Flutter 客户端（aBangumi）
   │ ④ BFF 服务端用 code 换 access/refresh token，生成一次性 ticket，
   │    302 → abangumi://oauth/callback?ticket=…&state=…
   │ ⑤ App 校验 state，POST /auth/bangumi/claim → 不透明 session_token
-  │ ⑥ 之后 API 请求走 /api/bangumi/*，由 BFF 代理并自动刷新
+  │ ⑥ 官方 API 请求走 /api/bangumi/*，p1 社区请求走
+  │    /api/bangumi-p1/*，均由 BFF 代理并自动刷新令牌
   ▼
-Bangumi API（api.bgm.tv）
+Bangumi API（api.bgm.tv / next.bgm.tv/p1）
 ```
 
 **OAuth 边界**：Bangumi OAuth 无 PKCE、必须使用 `client_secret`，因此 `client_secret`
@@ -41,29 +44,12 @@ Bangumi API（api.bgm.tv）
 
 ## 登录（OAuth，推荐）
 
-OAuth 依赖自行部署的 BFF（[`server/`](server/)），**本项目不提供已部署的实例**。
-没有可用 BFF 时无法使用 OAuth，请改用下方「手动令牌」方式。
+OAuth 登录服务由项目维护者提供，官方 Release 已完成配置。普通用户安装 APK 后可直接在
+“我的”页面选择「使用 Bangumi 账号登录」，无需自行部署服务器或填写 OAuth 参数。
 
-1. 部署并配置 BFF（详见 [`server/README.md`](server/README.md)），设置服务器环境变量：
-   - `BANGUMI_CLIENT_ID`：公开的 OAuth 应用 ID
-   - `BANGUMI_CLIENT_SECRET`：密钥，**仅服务器端**，绝不进入 Flutter
-   - `PUBLIC_BASE_URL`：BFF 的公开 HTTPS 地址
-2. 在 Bangumi 开发者控制台把回调地址设为（把 `PUBLIC_BASE_URL` 替换为你的域名）：
-
-   ```
-   https://<你的 BFF 域名>/auth/bangumi/callback
-   ```
-
-   回调必须是 HTTPS：浏览器授权后先回到 BFF，再由 BFF 302 跳回 App 深链
-   `abangumi://oauth/callback`。
-3. 构建时注入 BFF 地址：
-
-   ```bash
-   flutter build apk --release \
-     --dart-define=ABANGUMI_AUTH_BASE_URL=https://<你的 BFF 域名>
-   ```
-
-   可选注入公开的 `ABANGUMI_CLIENT_ID`（不传时使用 App 内置默认值）。
+服务端源码仍保留在 [`server/`](server/) 供开发、审计和自建使用；自建版本的环境变量与
+部署方式请参阅 [`server/README.md`](server/README.md)。官方服务不可用时仍可使用下方
+「手动令牌」方式登录。
 
 ## 登录（手动令牌，回退）
 
@@ -100,8 +86,10 @@ npm start       # 需先配置环境变量，见 server/README.md
 
 - 数据与版权归 [Bangumi (bgm.tv)](https://bgm.tv) 所有，本项目仅调用其公开 API。
 - release APK 使用 Flutter 模板默认的 debug 签名，仅供个人安装测试。
-- 仓库的 release 默认**不注入 BFF 地址**，只包含手动令牌登录；只有配置了仓库变量
-  `ABANGUMI_AUTH_BASE_URL` 才会启用 OAuth（见 [.github/workflows/release.yml](.github/workflows/release.yml)）。
+- GitHub Release 默认注入项目 OA/BFF 地址和公开 Client ID；可使用仓库变量
+  `ABANGUMI_AUTH_BASE_URL`、`ABANGUMI_CLIENT_ID` 覆盖（见
+  [.github/workflows/release.yml](.github/workflows/release.yml)）。`BANGUMI_CLIENT_SECRET`
+  永远只属于服务器部署环境。
 
 ## 技术栈
 

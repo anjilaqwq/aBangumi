@@ -2,23 +2,20 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// 衬线字体族：无字体资源，直接使用系统衬线回退。
-const String kSerifFamily = 'serif';
+/// System sans keeps dense Chinese metadata crisp on small screens.
+const String kSerifFamily = 'sans-serif';
 
 /// 衬线回退列表：当 'serif' 无法解析时按序回退到常见中文/西文衬线。
 const List<String> kSerifFamilyFallback = <String>[
-  'serif',
-  'Noto Serif CJK SC',
-  'Noto Serif SC',
-  'Songti SC',
-  'SimSun',
-  'Yu Mincho',
-  'Georgia',
-  'Times New Roman',
+  'Noto Sans CJK SC',
+  'Noto Sans SC',
+  'Microsoft YaHei',
+  'PingFang SC',
+  'Arial',
 ];
 
 /// 克制的圆角（日式极简：细线、小圆角）。
-const BorderRadius kRestrainedRadius = BorderRadius.all(Radius.circular(4));
+const BorderRadius kRestrainedRadius = BorderRadius.all(Radius.circular(14));
 
 /// 日式极简主题：仅浅色、Material 3，无阴影无渐变、hairline 细线、小圆角。
 abstract final class AppTheme {
@@ -26,15 +23,15 @@ abstract final class AppTheme {
     const ColorScheme scheme = ColorScheme.light(
       primary: AppColors.vermilion,
       onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFF2EBE2),
+      primaryContainer: Color(0xFFFFE7E9),
       onPrimaryContainer: AppColors.ink,
-      secondary: AppColors.muted,
+      secondary: AppColors.blue,
       onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: Color(0xFFECE8E0),
+      secondaryContainer: Color(0xFFE8EEFF),
       onSecondaryContainer: AppColors.ink,
       surface: AppColors.paper,
       onSurface: AppColors.ink,
-      surfaceContainerHighest: Color(0xFFEFEDE7),
+      surfaceContainerHighest: Color(0xFFEBE9E3),
       onSurfaceVariant: AppColors.muted,
       outline: AppColors.line,
       outlineVariant: AppColors.line,
@@ -52,6 +49,15 @@ abstract final class AppTheme {
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
       textTheme: _textTheme(),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: _AppPageTransitionsBuilder(),
+          TargetPlatform.iOS: _AppPageTransitionsBuilder(),
+          TargetPlatform.macOS: _AppPageTransitionsBuilder(),
+          TargetPlatform.windows: _AppPageTransitionsBuilder(),
+          TargetPlatform.linux: _AppPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.paper,
         foregroundColor: AppColors.ink,
@@ -62,7 +68,7 @@ abstract final class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: kSerifFamily,
           fontSize: 17,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w800,
           color: AppColors.ink,
           letterSpacing: 0.5,
         ),
@@ -86,7 +92,7 @@ abstract final class AppTheme {
         backgroundColor: AppColors.paper,
         selectedColor: scheme.secondaryContainer,
         side: const BorderSide(color: AppColors.line),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         elevation: 0,
         pressElevation: 0,
         labelStyle: const TextStyle(
@@ -123,10 +129,12 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.ink,
+          backgroundColor: AppColors.vermilion,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           textStyle: const TextStyle(
             fontFamily: kSerifFamily,
             fontSize: 14,
@@ -147,7 +155,7 @@ abstract final class AppTheme {
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppColors.muted,
+        color: AppColors.vermilion,
         linearTrackColor: AppColors.line,
         circularTrackColor: AppColors.line,
       ),
@@ -155,17 +163,17 @@ abstract final class AppTheme {
   }
 
   static ThemeData dark() {
-    const paper = Color(0xFF24241F);
-    const raised = Color(0xFF30302A);
-    const ink = Color(0xFFF2EEE4);
-    const muted = Color(0xFFC8C1B4);
-    const line = Color(0xFF57574E);
+    const paper = Color(0xFF171A22);
+    const raised = Color(0xFF242936);
+    const ink = Color(0xFFF4F5F7);
+    const muted = Color(0xFFB7BECA);
+    const line = Color(0xFF3B4252);
     const scheme = ColorScheme.dark(
       primary: AppColors.vermilion,
       onPrimary: Colors.white,
-      primaryContainer: Color(0xFF452426),
+      primaryContainer: Color(0xFF51262D),
       onPrimaryContainer: ink,
-      secondary: muted,
+      secondary: Color(0xFF8EABFF),
       onSecondary: paper,
       secondaryContainer: raised,
       onSecondaryContainer: ink,
@@ -318,6 +326,33 @@ abstract final class AppTheme {
         color: AppColors.muted,
         letterSpacing: 2,
       ),
+    );
+  }
+}
+
+class _AppPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _AppPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    final slide = Tween<Offset>(
+      begin: const Offset(0.055, 0),
+      end: Offset.zero,
+    ).animate(curved);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(position: slide, child: child),
     );
   }
 }

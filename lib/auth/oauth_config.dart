@@ -50,7 +50,8 @@ class OAuthConfig {
     }
 
     final host = uri.host.toLowerCase();
-    final debugLoopback = kDebugMode &&
+    final debugLoopback =
+        kDebugMode &&
         uri.scheme == 'http' &&
         (host == 'localhost' ||
             host == '127.0.0.1' ||
@@ -91,4 +92,5 @@ class OAuthConfig {
   static const String claimPath = '/auth/bangumi/claim';
   static const String logoutPath = '/auth/logout';
   static const String proxyPrefix = '/api/bangumi';
+  static const String privateProxyPrefix = '/api/bangumi-p1';
 }

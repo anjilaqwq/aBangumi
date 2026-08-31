@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../auth/oauth_config.dart';
 import '../models/models.dart';
+import '../store/dynamic_cache_store.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -45,17 +46,43 @@ class BangumiApi {
     if (t.authToken.isNotEmpty) 'Authorization': 'Bearer ${t.authToken}',
   };
 
-  static Future<dynamic> _getJson(Uri uri, {String? token}) async {
-    final resp = await http
-        .get(uri, headers: _headers(token: token))
-        .timeout(const Duration(seconds: 20));
-    if (resp.statusCode != 200) throw ApiException(resp.statusCode);
-    return jsonDecode(utf8.decode(resp.bodyBytes));
+  static Future<dynamic> _getJson(
+    Uri uri, {
+    String? token,
+    Duration cacheDuration = const Duration(minutes: 12),
+    bool forceRefresh = false,
+  }) async {
+    final authenticated = token != null && token.isNotEmpty;
+    final target = authenticated ? _authTarget(token) : null;
+    final requestUri = target == null
+        ? uri
+        : Uri.parse('${target.baseUrl}${uri.path}').replace(query: uri.query);
+
+    Future<dynamic> request() async {
+      final resp = await http
+          .get(
+            requestUri,
+            headers: target == null ? _headers() : _authHeaders(target),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (resp.statusCode != 200) throw ApiException(resp.statusCode);
+      return jsonDecode(utf8.decode(resp.bodyBytes));
+    }
+
+    // Never persist authenticated payloads in the anonymous page cache.
+    if (authenticated) return request();
+    return DynamicCacheStore.instance.loadJson(
+      key: uri.toString(),
+      loader: request,
+      maxAge: cacheDuration,
+      forceRefresh: forceRefresh,
+    );
   }
 
   /// 搜索条目（type 为 null 时不限类型；tags 用于标签页）
   static Future<PageData<Subject>> searchSubjects(
     String keyword, {
+    String? token,
     int? type,
     int limit = 30,
     int offset = 0,
@@ -65,52 +92,137 @@ class BangumiApi {
       if (type != null) 'type': [type],
       if (tags != null && tags.isNotEmpty) 'tag': tags,
     };
+    final map = await _postSearch(
+      path: '/v0/search/subjects',
+      keyword: keyword,
+      token: token,
+      filter: filter,
+      limit: limit,
+      offset: offset,
+    );
+    final data = (map['data'] as List?) ?? const [];
+    final list = data
+        .map((e) => Subject.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final total = (map['total'] as num?)?.toInt() ?? list.length;
+    final authenticated = token != null && token.isNotEmpty;
+    debugPrint(
+      '[bgm] search "$keyword" (authenticated=$authenticated type=$type tag=$tags offset=$offset) -> ${list.length}/$total',
+    );
+    return PageData(items: list, total: total);
+  }
+
+  /// 搜索角色（虚构角色、机体、组织等）。
+  static Future<PageData<Character>> searchCharacters(
+    String keyword, {
+    String? token,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final map = await _postSearch(
+      path: '/v0/search/characters',
+      keyword: keyword,
+      token: token,
+      limit: limit,
+      offset: offset,
+    );
+    final data = (map['data'] as List?) ?? const [];
+    final list = data
+        .map((e) => Character.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final total = (map['total'] as num?)?.toInt() ?? list.length;
+    debugPrint('[bgm] search characters "$keyword" -> ${list.length}/$total');
+    return PageData(items: list, total: total);
+  }
+
+  /// 搜索现实人物、公司与组合。
+  static Future<PageData<Person>> searchPersons(
+    String keyword, {
+    String? token,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final map = await _postSearch(
+      path: '/v0/search/persons',
+      keyword: keyword,
+      token: token,
+      limit: limit,
+      offset: offset,
+    );
+    final data = (map['data'] as List?) ?? const [];
+    final list = data
+        .map((e) => Person.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final total = (map['total'] as num?)?.toInt() ?? list.length;
+    debugPrint('[bgm] search persons "$keyword" -> ${list.length}/$total');
+    return PageData(items: list, total: total);
+  }
+
+  static Future<Map<String, dynamic>> _postSearch({
+    required String path,
+    required String keyword,
+    String? token,
+    Map<String, dynamic> filter = const {},
+    required int limit,
+    required int offset,
+  }) async {
+    final authenticated = token != null && token.isNotEmpty;
+    final target = authenticated ? _authTarget(token) : null;
+    final uri = Uri.parse(
+      '${target?.baseUrl ?? baseUrl}$path',
+    ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
     final resp = await http
         .post(
-          Uri.parse('$baseUrl/v0/search/subjects'),
-          headers: _headers(),
+          uri,
+          headers: target == null ? _headers() : _authHeaders(target),
           body: jsonEncode({
             'keyword': keyword,
             if (filter.isNotEmpty) 'filter': filter,
-            'limit': limit,
-            'offset': offset,
           }),
         )
         .timeout(const Duration(seconds: 20));
     if (resp.statusCode != 200) throw ApiException(resp.statusCode);
-    final map = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// 排行榜 / 浏览条目
+  static Future<PageData<Subject>> topSubjects({
+    int type = 2,
+    int limit = 20,
+    int offset = 0,
+    String sort = 'rank',
+    bool forceRefresh = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl/v0/subjects').replace(
+      queryParameters: {
+        'type': '$type',
+        'sort': sort,
+        'limit': '$limit',
+        'offset': '$offset',
+      },
+    );
+    final map =
+        await _getJson(uri, forceRefresh: forceRefresh) as Map<String, dynamic>;
     final data = (map['data'] as List?) ?? const [];
     final list = data
         .map((e) => Subject.fromJson(e as Map<String, dynamic>))
         .toList();
     final total = (map['total'] as num?)?.toInt() ?? list.length;
     debugPrint(
-      '[bgm] search "$keyword" (type=$type tag=$tags offset=$offset) -> ${list.length}/$total',
+      '[bgm] topSubjects(type=$type offset=$offset) -> ${list.length}/$total',
     );
     return PageData(items: list, total: total);
   }
 
-  /// 排行榜 / 浏览条目
-  static Future<List<Subject>> topSubjects({
-    int type = 2,
-    int limit = 30,
-    String sort = 'rank',
-  }) async {
-    final uri = Uri.parse('$baseUrl/v0/subjects').replace(
-      queryParameters: {'type': '$type', 'sort': sort, 'limit': '$limit'},
-    );
-    final map = await _getJson(uri) as Map<String, dynamic>;
-    final data = (map['data'] as List?) ?? const [];
-    final list = data
-        .map((e) => Subject.fromJson(e as Map<String, dynamic>))
-        .toList();
-    debugPrint('[bgm] topSubjects(type=$type) -> ${list.length} 条');
-    return list;
-  }
-
   /// 每日放送
-  static Future<List<CalendarDay>> calendar() async {
-    final list = await _getJson(Uri.parse('$baseUrl/calendar')) as List;
+  static Future<List<CalendarDay>> calendar({bool forceRefresh = false}) async {
+    final list =
+        await _getJson(
+              Uri.parse('$baseUrl/calendar'),
+              cacheDuration: const Duration(minutes: 30),
+              forceRefresh: forceRefresh,
+            )
+            as List;
     final days = list
         .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -119,16 +231,16 @@ class BangumiApi {
   }
 
   /// 条目详情
-  static Future<Subject> subject(int id) async {
+  static Future<Subject> subject(int id, {String? token}) async {
     debugPrint('[bgm] subject($id)');
     final map =
-        await _getJson(Uri.parse('$baseUrl/v0/subjects/$id'))
+        await _getJson(Uri.parse('$baseUrl/v0/subjects/$id'), token: token)
             as Map<String, dynamic>;
     return Subject.fromJson(map);
   }
 
   /// 章节列表（本篇）
-  static Future<List<Episode>> episodes(int subjectId) async {
+  static Future<List<Episode>> episodes(int subjectId, {String? token}) async {
     final uri = Uri.parse('$baseUrl/v0/episodes').replace(
       queryParameters: {
         'subject_id': '$subjectId',
@@ -137,7 +249,7 @@ class BangumiApi {
         'offset': '0',
       },
     );
-    final map = await _getJson(uri) as Map<String, dynamic>;
+    final map = await _getJson(uri, token: token) as Map<String, dynamic>;
     final data = (map['data'] as List?) ?? const [];
     return data
         .map((e) => Episode.fromJson(e as Map<String, dynamic>))
@@ -145,22 +257,28 @@ class BangumiApi {
   }
 
   /// 相关条目
-  static Future<List<Subject>> relatedSubjects(int subjectId) async {
+  static Future<List<Subject>> relatedSubjects(
+    int subjectId, {
+    String? token,
+  }) async {
     final uri = Uri.parse(
       '$baseUrl/v0/subjects/$subjectId/subjects',
     ).replace(queryParameters: {'limit': '50'});
-    final list = await _getJson(uri) as List;
+    final list = await _getJson(uri, token: token) as List;
     return list
         .map((e) => Subject.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   /// 角色
-  static Future<List<Character>> characters(int subjectId) async {
+  static Future<List<Character>> characters(
+    int subjectId, {
+    String? token,
+  }) async {
     final uri = Uri.parse(
       '$baseUrl/v0/subjects/$subjectId/characters',
     ).replace(queryParameters: {'limit': '50'});
-    final list = await _getJson(uri) as List;
+    final list = await _getJson(uri, token: token) as List;
     return list
         .map((e) => Character.fromJson(e as Map<String, dynamic>))
         .toList();

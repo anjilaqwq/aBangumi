@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/bangumi_api.dart';
 import '../models/models.dart';
+import '../navigation/routes.dart';
 import '../store/auth_store.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common/common.dart';
@@ -20,20 +21,34 @@ class SubjectDetailPage extends StatefulWidget {
 class _SubjectDetailPageState extends State<SubjectDetailPage> {
   late Future<Subject> _subjectFuture;
   late Future<List<Character>> _charactersFuture;
-  late final _EpisodeTracker _tracker;
+  late _EpisodeTracker _tracker;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
-    _subjectFuture = BangumiApi.subject(widget.subjectId);
-    _charactersFuture = BangumiApi.characters(widget.subjectId);
-    _tracker = _EpisodeTracker(widget.subjectId);
+    _authToken = AuthStore.instance.token.value;
+    _subjectFuture = BangumiApi.subject(widget.subjectId, token: _authToken);
+    _charactersFuture = BangumiApi.characters(
+      widget.subjectId,
+      token: _authToken,
+    );
+    _tracker = _EpisodeTracker(widget.subjectId, token: _authToken);
     AuthStore.instance.token.addListener(_syncTrackerAuth);
-    _syncTrackerAuth();
+    _tracker.updateAuth(_authToken);
   }
 
   void _syncTrackerAuth() {
-    _tracker.updateAuth(AuthStore.instance.token.value);
+    final token = AuthStore.instance.token.value;
+    if (token == _authToken) return;
+    _authToken = token;
+    _tracker.dispose();
+    _tracker = _EpisodeTracker(widget.subjectId, token: token);
+    _tracker.updateAuth(token);
+    setState(() {
+      _subjectFuture = BangumiApi.subject(widget.subjectId, token: token);
+      _charactersFuture = BangumiApi.characters(widget.subjectId, token: token);
+    });
   }
 
   @override
@@ -57,36 +72,53 @@ class _SubjectDetailPageState extends State<SubjectDetailPage> {
             return ErrorState(
               message: '加载失败：${snap.error}',
               onRetry: () => setState(() {
-                _subjectFuture = BangumiApi.subject(widget.subjectId);
+                _subjectFuture = BangumiApi.subject(
+                  widget.subjectId,
+                  token: _authToken,
+                );
               }),
             );
           }
           final s = snap.data!;
-          return ListView(
-            children: [
-              DetailHero(
-                coverUrl: s.cover,
-                title: s.title,
-                subtitle:
-                    s.originalTitle.isNotEmpty && s.originalTitle != s.title
-                    ? s.originalTitle
-                    : null,
-                trailing: s.score > 0
-                    ? _Score(score: s.score, total: s.ratingTotal)
-                    : null,
-                meta: [
-                  TagChip(label: s.typeLabel),
-                  if (s.platform.isNotEmpty) TagChip(label: s.platform),
-                  if (s.date.isNotEmpty) TagChip(label: s.date),
-                  if (s.rank > 0) TagChip(label: 'Rank #${s.rank}'),
-                ],
-              ),
-              _content(s),
-              _RelatedSection(subjectId: s.id),
-              _charactersSection(_charactersFuture),
-              SubjectCommunityPreview(subjectId: s.id, subjectType: s.type),
-              _EpisodesSection(tracker: _tracker),
-            ],
+          final coverHeroTag = 'subject-cover-${s.id}';
+          return AdaptiveContentWidth(
+            child: ListView(
+              children: [
+                DetailHero(
+                  coverUrl: s.cover,
+                  coverWidth: 116,
+                  coverHeight: 164,
+                  coverHeroTag: coverHeroTag,
+                  onCoverTap: s.cover.isEmpty
+                      ? null
+                      : () => AppRoutes.pushImagePreview(
+                          context,
+                          imageUrl: s.cover,
+                          title: s.title,
+                          heroTag: coverHeroTag,
+                        ),
+                  title: s.title,
+                  subtitle:
+                      s.originalTitle.isNotEmpty && s.originalTitle != s.title
+                      ? s.originalTitle
+                      : null,
+                  trailing: s.score > 0
+                      ? _Score(score: s.score, total: s.ratingTotal)
+                      : null,
+                  meta: [
+                    TagChip(label: s.typeLabel),
+                    if (s.platform.isNotEmpty) TagChip(label: s.platform),
+                    if (s.date.isNotEmpty) TagChip(label: s.date),
+                    if (s.rank > 0) TagChip(label: 'Rank #${s.rank}'),
+                  ],
+                ),
+                _content(s),
+                _RelatedSection(subjectId: s.id, token: _authToken),
+                _charactersSection(_charactersFuture),
+                SubjectCommunityPreview(subjectId: s.id, subjectType: s.type),
+                _EpisodesSection(tracker: _tracker),
+              ],
+            ),
           );
         },
       ),
@@ -630,7 +662,8 @@ class _CollectionEditorSheetState extends State<_CollectionEditorSheet> {
 
 class _RelatedSection extends StatefulWidget {
   final int subjectId;
-  const _RelatedSection({required this.subjectId});
+  final String? token;
+  const _RelatedSection({required this.subjectId, this.token});
 
   @override
   State<_RelatedSection> createState() => _RelatedSectionState();
@@ -643,7 +676,17 @@ class _RelatedSectionState extends State<_RelatedSection> {
   @override
   void initState() {
     super.initState();
-    _future = BangumiApi.relatedSubjects(widget.subjectId);
+    _future = BangumiApi.relatedSubjects(widget.subjectId, token: widget.token);
+  }
+
+  @override
+  void didUpdateWidget(covariant _RelatedSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.subjectId == widget.subjectId &&
+        oldWidget.token == widget.token) {
+      return;
+    }
+    _future = BangumiApi.relatedSubjects(widget.subjectId, token: widget.token);
   }
 
   @override
@@ -713,15 +756,12 @@ class _RelatedSectionState extends State<_RelatedSection> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: r.cover.isNotEmpty
-                      ? Image.network(
-                          r.cover,
-                          width: 96,
-                          height: 126,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _ph(96, 126),
-                        )
-                      : _ph(96, 126),
+                  child: CoverImage(
+                    imageUrl: r.cover,
+                    width: 96,
+                    height: 126,
+                    borderRadius: 6,
+                  ),
                 ),
                 if (r.relation.isNotEmpty)
                   Positioned(
@@ -780,15 +820,12 @@ class _RelatedSectionState extends State<_RelatedSection> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: r.cover.isNotEmpty
-                  ? Image.network(
-                      r.cover,
-                      width: 44,
-                      height: 62,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _ph(44, 62),
-                    )
-                  : _ph(44, 62),
+              child: CoverImage(
+                imageUrl: r.cover,
+                width: 44,
+                height: 62,
+                borderRadius: 4,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -832,13 +869,6 @@ class _RelatedSectionState extends State<_RelatedSection> {
     child: Text(text, style: const TextStyle(fontSize: 10)),
   );
 
-  Widget _ph(double w, double h) => Container(
-    width: w,
-    height: h,
-    color: AppColors.line,
-    child: const Icon(Icons.image, color: AppColors.muted),
-  );
-
   void _open(Subject r) {
     Navigator.push(
       context,
@@ -859,8 +889,8 @@ class _EpisodeTracker {
   int _authGeneration = 0;
   bool _disposed = false;
 
-  _EpisodeTracker(this.subjectId) {
-    episodes = BangumiApi.episodes(subjectId);
+  _EpisodeTracker(this.subjectId, {String? token}) {
+    episodes = BangumiApi.episodes(subjectId, token: token);
   }
 
   /// 由页面生命周期中的认证监听驱动，避免在 build 中触发请求。

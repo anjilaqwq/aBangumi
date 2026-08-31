@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import 'common/common.dart';
 
-/// 条目类型选择：横向克制的文字标签，选中项以朱红短线标记，底部细线收束。
 class SubjectTypeSelector extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onChanged;
-
-  /// 是否在最前追加「全部」选项（用于搜索 / 标签等不限类型的场景）。
   final bool includeAll;
-
-  /// 「全部」选项对应的值，默认 0。
   final int allValue;
+  final List<MapEntry<int, String>>? entries;
+  final Axis direction;
 
   const SubjectTypeSelector({
     super.key,
@@ -20,76 +16,88 @@ class SubjectTypeSelector extends StatelessWidget {
     required this.onChanged,
     this.includeAll = false,
     this.allValue = 0,
+    this.entries,
+    this.direction = Axis.horizontal,
   });
 
   @override
   Widget build(BuildContext context) {
-    final entries = <MapEntry<int, String>>[
-      if (includeAll) MapEntry(allValue, '全部'),
-      ...kSubjectTypes,
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 44,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                for (var i = 0; i < entries.length; i++) ...[
-                  _Tab(
-                    label: entries[i].value,
-                    active: entries[i].key == selected,
-                    onTap: () => onChanged(entries[i].key),
-                  ),
-                  if (i != entries.length - 1) const SizedBox(width: 22),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const HairlineDivider(),
-      ],
+    final options =
+        entries ??
+        <MapEntry<int, String>>[
+          if (includeAll) MapEntry(allValue, '全部'),
+          ...kSubjectTypes,
+        ];
+    final list = ListView.separated(
+      scrollDirection: direction,
+      padding: direction == Axis.horizontal
+          ? const EdgeInsets.symmetric(horizontal: 14, vertical: 6)
+          : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      itemCount: options.length,
+      separatorBuilder: (_, __) => direction == Axis.horizontal
+          ? const SizedBox(width: 8)
+          : const SizedBox(height: 7),
+      itemBuilder: (context, index) {
+        final entry = options[index];
+        return _TypePill(
+          label: entry.value,
+          active: entry.key == selected,
+          expanded: direction == Axis.vertical,
+          onTap: () => onChanged(entry.key),
+        );
+      },
     );
+    return direction == Axis.horizontal
+        ? SizedBox(height: 52, child: list)
+        : list;
   }
 }
 
-class _Tab extends StatelessWidget {
+class _TypePill extends StatelessWidget {
   final String label;
   final bool active;
+  final bool expanded;
   final VoidCallback onTap;
 
-  const _Tab({required this.label, required this.active, required this.onTap});
+  const _TypePill({
+    required this.label,
+    required this.active,
+    this.expanded = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     final colors = theme.colorScheme;
-    return SizedBox(
-      height: 44,
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          width: expanded ? double.infinity : null,
+          duration: const Duration(milliseconds: 180),
+          padding: EdgeInsets.symmetric(
+            horizontal: expanded ? 12 : 17,
+            vertical: expanded ? 11 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: active ? colors.primary : colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: active ? colors.primary : colors.outlineVariant,
+            ),
+          ),
+          child: Center(
+            child: Text(
               label,
-              style: (active ? textTheme.titleSmall : textTheme.bodyMedium)
-                  ?.copyWith(
-                    color: active ? colors.onSurface : colors.onSurfaceVariant,
-                    fontWeight: active ? FontWeight.w500 : FontWeight.w400,
-                  ),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: active ? colors.onPrimary : colors.onSurfaceVariant,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: 5),
-            SizedBox(
-              height: 2,
-              width: 18,
-              child: active ? ColoredBox(color: colors.primary) : null,
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -3,99 +3,127 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import 'common/common.dart';
 
-/// 条目卡片：无边框、无阴影的编辑部列表行，底部以细线分隔。
-///
-/// 保留 [subject] / [onTap] 契约，新增可选 [rank] 用于排行榜编号。
+/// Dense editorial subject card used by rankings, calendar and search.
 class SubjectCard extends StatelessWidget {
   final Subject subject;
   final VoidCallback? onTap;
-
-  /// 排行榜序号（可选），显示于封面左侧。
   final int? rank;
+  final bool dense;
 
-  const SubjectCard({super.key, required this.subject, this.onTap, this.rank});
+  const SubjectCard({
+    super.key,
+    required this.subject,
+    this.onTap,
+    this.rank,
+    this.dense = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     final colors = theme.colorScheme;
-    final rankValue = rank;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 14),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (rankValue != null) ...[
-                    SizedBox(width: 30, child: _rankText(context, rankValue)),
-                    const SizedBox(width: 12),
-                  ],
-                  CoverImage(
-                    imageUrl: subject.cover,
-                    width: 56,
-                    height: 78,
-                    borderRadius: 2,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
+    return Padding(
+      padding: EdgeInsets.only(bottom: dense ? 8 : 10),
+      child: Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(dense ? 14 : 16),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.all(dense ? 8 : 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (rank != null) ...[
+                  _RankBadge(rank: rank!, dense: dense),
+                  SizedBox(width: dense ? 7 : 9),
+                ],
+                CoverImage(
+                  imageUrl: subject.cover,
+                  width: dense ? 60 : 68,
+                  height: dense ? 84 : 96,
+                  borderRadius: dense ? 9 : 10,
+                ),
+                SizedBox(width: dense ? 9 : 12),
+                Expanded(
+                  child: SizedBox(
+                    height: dense ? 84 : 104,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          subject.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.titleSmall,
-                        ),
-                        if (subject.originalTitle.isNotEmpty &&
-                            subject.originalTitle != subject.title) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            subject.originalTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                subject.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.3,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
+                            if (subject.score > 0) ...[
+                              const SizedBox(width: 8),
+                              _ScoreBadge(score: subject.score),
+                            ],
+                          ],
+                        ),
+                        SizedBox(height: dense ? 3 : 5),
                         Text(
                           _metaText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
                         ),
-                        if (subject.tags.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                        const Spacer(),
+                        if (subject.tags.isNotEmpty)
                           Text(
-                            subject.tags.take(3).join(' · '),
+                            subject.tags
+                                .take(3)
+                                .map((tag) => '#$tag')
+                                .join('  '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.secondary,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
+                        SizedBox(height: dense ? 3 : 5),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 2,
+                          children: [
+                            _Engagement(
+                              icon: Icons.star_outline_rounded,
+                              value: subject.ratingTotal,
+                              suffix: '人评分',
+                            ),
+                            if (subject.collectionDoing > 0) ...[
+                              _Engagement(
+                                icon: Icons.people_alt_outlined,
+                                value: subject.collectionDoing,
+                                suffix: '人在看',
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _score(context, subject.score),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            const HairlineDivider(),
-          ],
+          ),
         ),
       ),
     );
@@ -109,40 +137,87 @@ class SubjectCard extends StatelessWidget {
     ];
     return parts.join(' · ');
   }
+}
 
-  Widget _rankText(BuildContext context, int rank) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final colors = theme.colorScheme;
-    return Text(
-      rank < 10 ? '0$rank' : '$rank',
-      style: textTheme.titleMedium?.copyWith(
-        color: colors.onSurface,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 0.5,
+class _RankBadge extends StatelessWidget {
+  final int rank;
+  final bool dense;
+
+  const _RankBadge({required this.rank, required this.dense});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final featured = rank <= 3;
+    return Container(
+      width: dense ? 31 : 35,
+      height: dense ? 31 : 35,
+      decoration: BoxDecoration(
+        color: featured ? colors.primary : colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(dense ? 9 : 11),
+      ),
+      child: Center(
+        child: Text(
+          rank.toString().padLeft(2, '0'),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: featured ? colors.onPrimary : colors.onSurfaceVariant,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _score(BuildContext context, double score) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final colors = theme.colorScheme;
-    if (score <= 0) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text(
-          score.toStringAsFixed(1),
-          style: textTheme.titleMedium?.copyWith(
-            color: colors.primary,
-            fontWeight: FontWeight.w500,
-          ),
+class _ScoreBadge extends StatelessWidget {
+  final double score;
+
+  const _ScoreBadge({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        score.toStringAsFixed(1),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: colors.primary,
+          fontWeight: FontWeight.w900,
         ),
-        const SizedBox(height: 2),
+      ),
+    );
+  }
+}
+
+class _Engagement extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String suffix;
+
+  const _Engagement({
+    required this.icon,
+    required this.value,
+    required this.suffix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: colors.onSurfaceVariant),
+        const SizedBox(width: 3),
         Text(
-          '评分',
-          style: textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+          value > 0 ? '$value $suffix' : '暂无$suffix',
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant),
         ),
       ],
     );

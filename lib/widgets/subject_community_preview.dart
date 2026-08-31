@@ -4,6 +4,7 @@ import '../api/bangumi_private_api.dart';
 import '../models/models.dart';
 import '../models/private_api_models.dart';
 import '../navigation/routes.dart';
+import '../store/auth_store.dart';
 import 'common/common.dart';
 
 class SubjectCommunityPreview extends StatefulWidget {
@@ -27,13 +28,27 @@ class _SubjectCommunityPreviewState extends State<SubjectCommunityPreview> {
   @override
   void initState() {
     super.initState();
-    _future = BangumiPrivateApi.subjectCommunity(widget.subjectId);
+    _future = _load();
+    AuthStore.instance.token.addListener(_authChanged);
   }
+
+  Future<P1SubjectCommunity> _load() => BangumiPrivateApi.subjectCommunity(
+    widget.subjectId,
+    token: AuthStore.instance.token.value,
+  );
+
+  void _authChanged() => _reload();
 
   void _reload() {
     setState(() {
-      _future = BangumiPrivateApi.subjectCommunity(widget.subjectId);
+      _future = _load();
     });
+  }
+
+  @override
+  void dispose() {
+    AuthStore.instance.token.removeListener(_authChanged);
+    super.dispose();
   }
 
   @override

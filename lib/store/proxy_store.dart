@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -62,7 +63,9 @@ class ProxyStore extends ChangeNotifier {
       port: _prefs!.getInt(_portKey) ?? 0,
       protocol: protocol,
     );
-    await refreshSystemProxy();
+    // Network probing can take seconds on a fresh emulator or offline device.
+    // Keep it out of the first-frame path; listeners receive the result later.
+    unawaited(refreshSystemProxy());
   }
 
   Future<void> refreshSystemProxy() async {

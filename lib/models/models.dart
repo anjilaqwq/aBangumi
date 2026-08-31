@@ -64,6 +64,14 @@ const List<MapEntry<int, String>> kSubjectTypes = [
   MapEntry(6, '三次元'),
 ];
 
+/// 搜索页分类。负数为客户端聚合类型，不会作为条目 type 发送给 API。
+const int kSearchPeopleType = -1;
+const List<MapEntry<int, String>> kSearchTypes = [
+  MapEntry(0, '全部'),
+  ...kSubjectTypes,
+  MapEntry(kSearchPeopleType, '人物'),
+];
+
 /// 收藏类型
 const List<MapEntry<int, String>> kCollectionTypes = [
   MapEntry(1, '想看'),
@@ -380,7 +388,7 @@ class Character {
       imagesLarge: _https(
         images['large']?.toString() ?? images['grid']?.toString() ?? '',
       ),
-      summary: j['summary']?.toString() ?? '',
+      summary: j['summary']?.toString() ?? j['short_summary']?.toString() ?? '',
       infobox:
           (j['infobox'] as List?)
               ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))
@@ -460,7 +468,7 @@ class Person {
       imagesLarge: _https(
         images['large']?.toString() ?? images['grid']?.toString() ?? '',
       ),
-      summary: j['summary']?.toString() ?? '',
+      summary: j['summary']?.toString() ?? j['short_summary']?.toString() ?? '',
       infobox:
           (j['infobox'] as List?)
               ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))

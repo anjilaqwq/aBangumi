@@ -72,6 +72,8 @@ void main() {
     expect(topic.id, 40823);
     expect(topic.replyCount, 44);
     expect(topic.creator?.displayName, 'Sai');
+    expect(topic.creator?.username, 'sai');
+    expect(topic.creator?.avatar, 'https://lain.bgm.tv/avatar.jpg');
     expect(topic.subject?.title, '测试条目');
     expect(topic.replies.single.content, '主楼内容');
     expect(topic.replies.single.replies.single.content, '嵌套回复');

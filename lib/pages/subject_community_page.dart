@@ -4,6 +4,7 @@ import '../api/bangumi_private_api.dart';
 import '../models/models.dart';
 import '../models/private_api_models.dart';
 import '../navigation/routes.dart';
+import '../store/auth_store.dart';
 import '../widgets/common/common.dart';
 
 class SubjectCommunityPage extends StatelessWidget {
@@ -39,6 +40,7 @@ class SubjectCommunityPage extends StatelessWidget {
             _PagedList<P1SubjectTopic>(
               loader: (offset) => BangumiPrivateApi.subjectTopics(
                 subjectId,
+                token: AuthStore.instance.token.value,
                 limit: 20,
                 offset: offset,
               ),
@@ -51,6 +53,7 @@ class SubjectCommunityPage extends StatelessWidget {
             _PagedList<P1SubjectReview>(
               loader: (offset) => BangumiPrivateApi.subjectReviews(
                 subjectId,
+                token: AuthStore.instance.token.value,
                 limit: 20,
                 offset: offset,
               ),
@@ -63,6 +66,7 @@ class SubjectCommunityPage extends StatelessWidget {
             _PagedList<P1SubjectComment>(
               loader: (offset) => BangumiPrivateApi.subjectComments(
                 subjectId,
+                token: AuthStore.instance.token.value,
                 limit: 20,
                 offset: offset,
               ),

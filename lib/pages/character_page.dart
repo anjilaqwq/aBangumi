@@ -62,59 +62,61 @@ class _CharacterPageState extends State<CharacterPage> {
     }
 
     final character = snapshot.data!;
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 32),
-      children: [
-        DetailHero(
-          coverUrl: character.imagesLarge,
-          coverAlignment: Alignment.topCenter,
-          title: character.title,
-          subtitle:
-              character.name.isNotEmpty && character.name != character.title
-              ? character.name
-              : null,
-          meta: [
-            const TagChip(label: '角色'),
-            if (character.gender.isNotEmpty) TagChip(label: character.gender),
-            if (character.birthYear.isNotEmpty)
-              TagChip(label: '${character.birthYear}年生'),
-            if (character.bloodType.isNotEmpty)
-              TagChip(label: '${character.bloodType}型'),
-            if (character.statCollects > 0)
-              TagChip(label: '${character.statCollects} 人收藏'),
-          ],
-        ),
-        if (character.infobox.isNotEmpty) ...[
-          const SectionHeader(title: '资料'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: InfoBox(
-              entries: character.infobox
-                  .map((entry) => InfoEntry(entry.key, entry.value))
-                  .toList(),
-            ),
+    return AdaptiveContentWidth(
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          DetailHero(
+            coverUrl: character.imagesLarge,
+            coverAlignment: Alignment.topCenter,
+            title: character.title,
+            subtitle:
+                character.name.isNotEmpty && character.name != character.title
+                ? character.name
+                : null,
+            meta: [
+              const TagChip(label: '角色'),
+              if (character.gender.isNotEmpty) TagChip(label: character.gender),
+              if (character.birthYear.isNotEmpty)
+                TagChip(label: '${character.birthYear}年生'),
+              if (character.bloodType.isNotEmpty)
+                TagChip(label: '${character.bloodType}型'),
+              if (character.statCollects > 0)
+                TagChip(label: '${character.statCollects} 人收藏'),
+            ],
           ),
-        ],
-        if (character.summary.trim().isNotEmpty) ...[
-          const SectionHeader(title: '简介'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              character.summary.trim(),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                height: 1.8,
+          if (character.infobox.isNotEmpty) ...[
+            const SectionHeader(title: '资料'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: InfoBox(
+                entries: character.infobox
+                    .map((entry) => InfoEntry(entry.key, entry.value))
+                    .toList(),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: HairlineDivider(),
-          ),
+          ],
+          if (character.summary.trim().isNotEmpty) ...[
+            const SectionHeader(title: '简介'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                character.summary.trim(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  height: 1.8,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: HairlineDivider(),
+            ),
+          ],
+          _subjectsSection(),
+          _personsSection(),
         ],
-        _subjectsSection(),
-        _personsSection(),
-      ],
+      ),
     );
   }
 

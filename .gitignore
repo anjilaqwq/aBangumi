@@ -48,6 +48,12 @@ app.*.map.json
 **/android/local.properties
 **/android/.gradle
 **/android/.kotlin
+
+# Local development, handoff and visual-test artifacts
+/.dart-home/
+/.dsh/
+/*.png
+/ui_*.xml
 **/android/**/build/
 
 # 环境变量（各层级忽略，仅保留示例文件）

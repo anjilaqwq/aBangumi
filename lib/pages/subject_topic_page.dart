@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../api/bangumi_private_api.dart';
 import '../models/private_api_models.dart';
 import '../navigation/routes.dart';
+import '../store/auth_store.dart';
 import '../widgets/common/common.dart';
+import '../widgets/post_content.dart';
 
 class SubjectTopicPage extends StatefulWidget {
   final int topicId;
@@ -20,11 +22,25 @@ class _SubjectTopicPageState extends State<SubjectTopicPage> {
   @override
   void initState() {
     super.initState();
-    _future = BangumiPrivateApi.subjectTopic(widget.topicId);
+    _future = _load();
+    AuthStore.instance.token.addListener(_authChanged);
+  }
+
+  Future<P1SubjectTopic> _load() => BangumiPrivateApi.subjectTopic(
+    widget.topicId,
+    token: AuthStore.instance.token.value,
+  );
+
+  void _authChanged() => setState(() => _future = _load());
+
+  @override
+  void dispose() {
+    AuthStore.instance.token.removeListener(_authChanged);
+    super.dispose();
   }
 
   Future<void> _reload() async {
-    final future = BangumiPrivateApi.subjectTopic(widget.topicId);
+    final future = _load();
     setState(() => _future = future);
     await future;
   }
@@ -144,11 +160,27 @@ class _ReplyCard extends StatelessWidget {
                 const SizedBox(width: 9),
               ],
               Expanded(
-                child: Text(
-                  creator?.displayName ?? '匿名用户',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleSmall,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      creator?.displayName ?? '匿名用户',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (creator != null && creator.username.isNotEmpty)
+                      Text(
+                        '@${creator.username}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Text(
@@ -160,10 +192,7 @@ class _ReplyCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          SelectableText(
-            reply.content.trim(),
-            style: textTheme.bodyMedium?.copyWith(height: 1.65),
-          ),
+          PostContent(content: reply.content.trim()),
           const SizedBox(height: 10),
           Text(
             _formatDateTime(reply.createdAt),

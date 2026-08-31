@@ -1,24 +1,20 @@
 import 'package:flutter/material.dart' show Color;
 
-/// 日式极简配色：米白纸面 + 近黑墨色 + 一点朱红。
-///
-/// 全部为无透明度的扁平色，静谧克制，无渐变、无阴影。
+/// Editorial palette: warm paper, deep ink and a vivid Bangumi red.
 abstract final class AppColors {
-  /// 米白纸面（背景）。
-  static const Color paper = Color(0xFFFAFAF7);
+  static const Color paper = Color(0xFFF6F5F1);
 
-  /// 近黑墨色（主文字）。
-  static const Color ink = Color(0xFF1A1A18);
+  static const Color ink = Color(0xFF202532);
 
-  /// 次级文字（暖灰）。
-  static const Color muted = Color(0xFF6B675E);
+  static const Color muted = Color(0xFF646B78);
 
-  /// 弱化文字。
-  static const Color subtle = Color(0xFFA09A8D);
+  static const Color subtle = Color(0xFF979DA8);
 
-  /// 细分隔线（暖灰，1px hairline）。
-  static const Color line = Color(0xFFD8D5CD);
+  static const Color line = Color(0xFFDDD9D1);
 
-  /// 朱红：唯一点缀色，谨慎使用（1–2 处）。
-  static const Color vermilion = Color(0xFFC3272B);
+  static const Color vermilion = Color(0xFFE94857);
+
+  static const Color blue = Color(0xFF4776E6);
+
+  static const Color mint = Color(0xFF2F9E88);
 }

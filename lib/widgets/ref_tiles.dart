@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import 'common/common.dart';
 
 /// 出演作品行（用于角色页/人物页的作品列表）
 class WorkTile extends StatelessWidget {
@@ -13,15 +14,13 @@ class WorkTile extends StatelessWidget {
       dense: true,
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(4),
-        child: work.image.isNotEmpty
-            ? Image.network(
-                work.image,
-                width: 40,
-                height: 56,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _ph(),
-              )
-            : _ph(),
+        child: CoverImage(
+          imageUrl: work.image,
+          width: 40,
+          height: 56,
+          borderRadius: 4,
+          placeholder: _ph(),
+        ),
       ),
       title: Text(
         work.title,
@@ -70,6 +69,8 @@ class CastTile extends StatelessWidget {
           child: cast.imagesLarge.isNotEmpty
               ? Image.network(
                   cast.imagesLarge,
+                  cacheWidth: 120,
+                  cacheHeight: 120,
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
                   errorBuilder: (_, __, ___) => _personPlaceholder(context),

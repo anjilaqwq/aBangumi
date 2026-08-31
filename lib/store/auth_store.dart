@@ -262,8 +262,7 @@ class AuthStore {
         ? null
         : Object.hash(callback.ticket, callback.state);
     if (_callbackInFlight ||
-        (fingerprint != null &&
-            fingerprint == _completedCallbackFingerprint)) {
+        (fingerprint != null && fingerprint == _completedCallbackFingerprint)) {
       return;
     }
     _callbackInFlight = true;

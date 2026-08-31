@@ -62,54 +62,56 @@ class _PersonPageState extends State<PersonPage> {
     }
 
     final person = snapshot.data!;
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 32),
-      children: [
-        DetailHero(
-          coverUrl: person.imagesLarge,
-          title: person.name,
-          meta: [
-            ...person.career.map(
-              (career) => TagChip(label: careerLabel(career)),
-            ),
-            if (person.gender.isNotEmpty) TagChip(label: person.gender),
-            if (person.birthYear.isNotEmpty)
-              TagChip(label: '${person.birthYear}年生'),
-            if (person.statCollects > 0)
-              TagChip(label: '${person.statCollects} 人收藏'),
-          ],
-        ),
-        if (person.infobox.isNotEmpty) ...[
-          const SectionHeader(title: '资料'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: InfoBox(
-              entries: person.infobox
-                  .map((entry) => InfoEntry(entry.key, entry.value))
-                  .toList(),
-            ),
+    return AdaptiveContentWidth(
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          DetailHero(
+            coverUrl: person.imagesLarge,
+            title: person.name,
+            meta: [
+              ...person.career.map(
+                (career) => TagChip(label: careerLabel(career)),
+              ),
+              if (person.gender.isNotEmpty) TagChip(label: person.gender),
+              if (person.birthYear.isNotEmpty)
+                TagChip(label: '${person.birthYear}年生'),
+              if (person.statCollects > 0)
+                TagChip(label: '${person.statCollects} 人收藏'),
+            ],
           ),
-        ],
-        if (person.summary.trim().isNotEmpty) ...[
-          const SectionHeader(title: '简介'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              person.summary.trim(),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                height: 1.8,
+          if (person.infobox.isNotEmpty) ...[
+            const SectionHeader(title: '资料'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: InfoBox(
+                entries: person.infobox
+                    .map((entry) => InfoEntry(entry.key, entry.value))
+                    .toList(),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: HairlineDivider(),
-          ),
+          ],
+          if (person.summary.trim().isNotEmpty) ...[
+            const SectionHeader(title: '简介'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                person.summary.trim(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  height: 1.8,
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: HairlineDivider(),
+            ),
+          ],
+          _charactersSection(),
+          _subjectsSection(),
         ],
-        _charactersSection(),
-        _subjectsSection(),
-      ],
+      ),
     );
   }
 
