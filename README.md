@@ -70,3 +70,9 @@ flutter build apk --release
 ## 技术栈
 
 Flutter 3.35 · Material 3 · http · shared_preferences · flutter_secure_storage · app_links · url_launcher
+
+## 许可证
+
+本项目采用 [WTFNMFPL](LICENSE)（Do What The Fuck You Want To But It's Not My Fault Public License，第 1 版）：想怎么用就怎么用，使用过程中出现的问题由使用者自行承担。
+
+第三方依赖、组件和 Bangumi 数据保留各自的许可证与版权声明。
